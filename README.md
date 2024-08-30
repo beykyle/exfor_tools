@@ -42,7 +42,7 @@ entry.plot_experiment(
 
 This should produce the following figure: 
 
-![](https://github.com/beykyle/exfor_tools/assets/lead_208_pp_dxds.png)
+![](https://github.com/beykyle/exfor_tools/blob/main/assets/lead_208_pp_dxds.png)
 
 
 
