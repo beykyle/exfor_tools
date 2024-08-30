@@ -1,9 +1,8 @@
 import numpy as np
-from matplotlib import pyplot as plt
 import periodictable
 
 from x4i3 import exfor_manager
-from x4i3.exfor_reactions import X4Reaction, X4ReactionCombination
+from x4i3.exfor_reactions import X4Reaction
 
 
 __EXFOR_DB__ = None
@@ -300,7 +299,7 @@ class ExforDifferentialData:
             if data_set.units[xi] != data_set.units[dxi]:
                 raise ValueError(
                     "Inconsistent units between 'Angle' and 'd(Angle)' fields :"
-                    + f"{data_set.units[xi]} and {data_seta.units[dxi]}"
+                    + f"{data_set.units[xi]} and {data_set.units[dxi]}"
                 )
         else:
             dx = np.zeros(len(x))

@@ -3,7 +3,7 @@ from .exfor_tools import (
     sort_measurements_by_energy,
     ExforDifferentialData,
     ExforDifferentialDataSet,
-    init_exfor_db
+    init_exfor_db,
 )
 
 init_exfor_db()
