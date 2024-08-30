@@ -1,9 +1,24 @@
 # exfor_tools
 Some lightweight tools to grab data from the [EXFOR database](https://www-nds.iaea.org/exfor/) using the [x4i3 library](https://github.com/afedynitch/x4i3/), and organize it for use in the calibration of optical potentials
 
-# install
+## quick start
+```
+ pip install exfor-tools
+```
 
-# example
+Package hosted at [pypi.org/project/exfor-tools/](https://pypi.org/project/exfor-tools/).
+
+## testing
+
+TODO
+
+
+## examples and tutorials
+
+Check out [examples/](https://github.com/beykyle/exfor_tools/tree/main/examples)
+
+
+
 ```python
 all_entries_lead208_pp = get_exfor_differential_data(
     target=(208, 82),
