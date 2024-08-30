@@ -288,7 +288,7 @@ class ExforDifferentialData:
             if data_set.units[yi] != data_set.units[dyi]:
                 raise ValueError(
                     "Inconsistent units between 'Data' and 'd(Data)' fields :"
-                    + f"{data_set.units[yi]} and {data_seta.units[dyi]}"
+                    + f"{data_set.units[yi]} and {data_set.units[dyi]}"
                 )
         else:
             dy = np.zeros(len(x))
