@@ -261,13 +261,6 @@ class ExforDifferentialData:
         # TODO in the case that number of unique energies > number of angles,
         # then store as single-angle data sets for a range of energies
 
-        # these fields are mandatory
-        if "Angle" not in data_set.labels:
-            raise ValueError("Missing 'Angle' field!")
-            # TODO allow for momentum transfer as well as angle
-        if "Data" not in data_set.labels:
-            raise ValueError("Missing 'Data' field!")
-
         # sanitize labels and convert units
         for i in range(len(data_set.labels)):
             if data_set.labels[i] in label_matches:
@@ -281,6 +274,13 @@ class ExforDifferentialData:
 
                 # unit conversion
                 data_array[:, i] *= conversion
+
+        # these fields are mandatory
+        if "Angle" not in data_set.labels:
+            raise ValueError("Missing 'Angle' field!")
+            # TODO allow for momentum transfer as well as angle
+        if "Data" not in data_set.labels:
+            raise ValueError("Missing 'Data' field!")
 
         xi = np.argmax(np.array(data_set.labels) == "Angle")
         yi = np.argmax(np.array(data_set.labels) == "Data")
