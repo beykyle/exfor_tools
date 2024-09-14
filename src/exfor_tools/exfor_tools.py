@@ -70,7 +70,7 @@ def sort_measurements_by_energy(all_entries, min_num_pts=5):
     for entry, data in all_entries.items():
         for measurement in data.measurements:
             if measurement.data.shape[1] > min_num_pts:
-                energies.append(measurement.Ecm)
+                energies.append(measurement.Elab)
                 measurements.append(measurement)
 
     energies = np.array(energies)
@@ -91,7 +91,7 @@ def sort_measurements_by_energy(all_entries, min_num_pts=5):
 
         measurements_condensed.append(
             ExforDifferentialDataSet(
-                m.Ecm, m.dEcm, m.energy_units, m.units, m.labels, data
+                m.Elab, m.dElab, m.energy_units, m.units, m.labels, data
             )
         )
     return measurements_condensed
@@ -137,9 +137,9 @@ unit_conversions = dict(
 
 
 class ExforDifferentialDataSet:
-    def __init__(self, Ecm, dEcm, energy_units, units, labels, data):
-        self.Ecm = Ecm
-        self.dEcm = dEcm
+    def __init__(self, Elab, dElab, energy_units, units, labels, data):
+        self.Elab = Elab
+        self.dElab = dElab
         self.energy_units = energy_units
         self.units = units
         self.labels = labels
@@ -419,9 +419,9 @@ class ExforDifferentialData:
                 offset_text = f"\n($\\times$ {offset:0.0e})"
             else:
                 offset_text = f"\n($+$ {offset:1.0f})"
-            label = f"{m.Ecm}"
+            label = f"{m.Elab}"
             if label_energy_err:
-                label += f" $\pm$ {m.dEcm}"
+                label += f" $\pm$ {m.dElab}"
             label += f" {m.energy_units}"
             if label_offset:
                 label += offset_text
