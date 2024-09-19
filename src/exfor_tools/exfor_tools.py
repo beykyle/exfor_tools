@@ -391,11 +391,11 @@ class ExforDifferentialData:
 
         # plot each measurement and add a label
         for offset, m in zip(offsets, measurements):
-            # plot the data
-            x = np.copy(m.data[0, :], dtype=np.float128)
-            dx = np.copy(m.data[1, :], dtype=np.float128)
-            y = np.copy(m.data[2, :], dtype=np.float128)
-            dy = np.copy(m.data[3, :], dtype=np.float128)
+            # copy the data into a big as hell float to handle big offsets
+            x = np.copy(m.data[0, :]).astype(np.longdouble)
+            dx = np.copy(m.data[1, :]).astype(np.longdouble)
+            y = np.copy(m.data[2, :]).astype(np.longdouble)
+            dy = np.copy(m.data[3, :]).astype(np.longdouble)
             if log:
                 y *= offset
                 dy *= offset
