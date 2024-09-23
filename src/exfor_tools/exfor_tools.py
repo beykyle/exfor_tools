@@ -405,7 +405,7 @@ class ExforDifferentialData:
             ax.errorbar(x, y, yerr=dy, xerr=dx, color="k", linestyle="None", marker=".")
 
             if add_baseline:
-                ax.plot([0, 180], [offset, offset], "k--", alpha=0.5)
+                ax.plot(xlim, [offset, offset], "k--", alpha=0.5)
 
             hloc_deg = label_hloc_deg
             yloc_deg = np.mean(y[np.argmin(np.fabs(x - hloc_deg)) :])
