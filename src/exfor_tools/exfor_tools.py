@@ -64,7 +64,10 @@ def get_exfor_differential_data(
 
 
 def sort_measurements_by_energy(all_entries, min_num_pts=5):
-    r"""given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all the ExforDifferentialDataSet's and sorts them by energy, concatenating ones that are at the same energy"""
+    r"""Given a dictionary form EXFOR entry number to ExforDifferentialData,
+    grabs all the ExforDifferentialDataSet's and sorts them by energy,
+    concatenating ones that are at the same energy
+    """
     measurements = []
     energies = []
     for entry, data in all_entries.items():
@@ -91,7 +94,14 @@ def sort_measurements_by_energy(all_entries, min_num_pts=5):
 
         measurements_condensed.append(
             ExforDifferentialDataSet(
-                m.Elab, m.dElab, m.energy_units, m.units, m.labels, data
+                m.entry,
+                m.subentry,
+                m.Elab,
+                m.dElab,
+                m.energy_units,
+                m.units,
+                m.labels,
+                data,
             )
         )
     return measurements_condensed
@@ -137,7 +147,9 @@ unit_conversions = dict(
 
 
 class ExforDifferentialDataSet:
-    def __init__(self, Elab, dElab, energy_units, units, labels, data):
+    def __init__(self, entry, subentry, Elab, dElab, energy_units, units, labels, data):
+        self.entry = entry
+        self.subentry = subentry
         self.Elab = Elab
         self.dElab = dElab
         self.energy_units = energy_units
@@ -228,6 +240,7 @@ class ExforDifferentialData:
                 ):
                     data_sets.append(data_set)
                     measurements = self.get_measurements_from_subentry(
+                        key,
                         data_set,
                         common_energy=common_energy,
                         common_energy_uncertainty=common_energy_uncertainty,
@@ -251,6 +264,7 @@ class ExforDifferentialData:
 
     def get_measurements_from_subentry(
         self,
+        subentry,
         data_set,
         common_energy=None,
         common_energy_uncertainty=None,
@@ -352,7 +366,14 @@ class ExforDifferentialData:
         sorted_data = sorted(zip(energies, energy_errs, measurements))
         return [
             ExforDifferentialDataSet(
-                energy, energy_err, energy_units, units, labels, measurement
+                self.entry,
+                subentry,
+                energy,
+                energy_err,
+                energy_units,
+                units,
+                labels,
+                measurement,
             )
             for energy, energy_err, measurement in sorted_data
             if energy >= self.energy_range[0] and energy < self.energy_range[1]
