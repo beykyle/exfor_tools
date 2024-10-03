@@ -106,12 +106,14 @@ def sort_measurements_by_energy(all_entries, min_num_pts=5):
         )
     return measurements_condensed
 
+#TODO change product to reaction in all inputs
+
+reactions = ["QE (p,n)", "(p,p)", "(n,n)"]
 
 # these are the supported quantities at the moment
 # XS = cross section, A = angle, Ruth = Rutherford cross section, Ay = analyzing power
-# TODO add DE (differential with energy)
 quantity_matches = {
-    "dXS/dA": [["DA"]],
+    "dXS/dA": [["DA"]], #TODO add PAR
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
     "Ay": [["POL/DA", "ANA"]],
 }
