@@ -13,6 +13,11 @@ def init_exfor_db():
     if __EXFOR_DB__ is None:
         __EXFOR_DB__ = exfor_manager.X4DBManagerDefault()
 
+def get_db():
+    global __EXFOR_DB__
+    if __EXFOR_DB__ is None:
+        init_exfor_db()
+    return __EXFOR_DB__
 
 def get_exfor_differential_data(
     target, projectile, quantity, energy_range=None, product=None
@@ -63,17 +68,8 @@ def get_exfor_differential_data(
     return data_sets
 
 
-def sort_measurements_by_energy(all_entries, min_num_pts=5):
-    r"""given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all the ExforDifferentialDataSet's and sorts them by energy, concatenating ones that are at the same energy"""
-    measurements = []
-    energies = []
-    for entry, data in all_entries.items():
-        for measurement in data.measurements:
-            if measurement.data.shape[1] > min_num_pts:
-                energies.append(measurement.Elab)
-                measurements.append(measurement)
-
-    energies = np.array(energies)
+def sort_measurement_list(measurements, min_num_pts=5):
+    energies = np.array([m.Elab for m in measurements])
     energies_sorted = energies[np.argsort(energies)]
     measurements_sorted = [measurements[i] for i in np.argsort(energies)]
     vals, idx, cnt = np.unique(energies_sorted, return_counts=True, return_index=True)
@@ -94,7 +90,24 @@ def sort_measurements_by_energy(all_entries, min_num_pts=5):
                 m.Elab, m.dElab, m.energy_units, m.units, m.labels, data
             )
         )
+
+    # sanitize
+    for m in measurements_condensed:
+        m.data = m.data[:,m.data[0,:].argsort()]
+        m.data = m.data[:,  np.logical_and(m.data[0,:] >= 0 , m.data[0,:] <= 180) ]
+
     return measurements_condensed
+
+
+def sort_measurements_by_energy(all_entries, min_num_pts=5):
+    r"""given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all the ExforDifferentialDataSet's and sorts them by energy, concatenating ones that are at the same energy"""
+    measurements = []
+    for entry, data in all_entries.items():
+        for measurement in data.measurements:
+            if measurement.data.shape[1] > min_num_pts:
+                measurements.append(measurement)
+    return sort_measurement_list(measurements, min_num_pts=min_num_pts)
+
 
 
 # these are the supported quantities at the moment
