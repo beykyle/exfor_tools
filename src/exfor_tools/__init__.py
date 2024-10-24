@@ -6,7 +6,7 @@ from .exfor_tools import (
     ExforDifferentialData,
     ExforDifferentialDataSet,
     init_exfor_db,
-    get_db
+    get_db,
 )
 
 init_exfor_db()

@@ -13,11 +13,13 @@ def init_exfor_db():
     if __EXFOR_DB__ is None:
         __EXFOR_DB__ = exfor_manager.X4DBManagerDefault()
 
+
 def get_db():
     global __EXFOR_DB__
     if __EXFOR_DB__ is None:
         init_exfor_db()
     return __EXFOR_DB__
+
 
 def get_exfor_differential_data(
     target, projectile, quantity, energy_range=None, product=None
@@ -93,8 +95,8 @@ def sort_measurement_list(measurements, min_num_pts=5):
 
     # sanitize
     for m in measurements_condensed:
-        m.data = m.data[:,m.data[0,:].argsort()]
-        m.data = m.data[:,  np.logical_and(m.data[0,:] >= 0 , m.data[0,:] <= 180) ]
+        m.data = m.data[:, m.data[0, :].argsort()]
+        m.data = m.data[:, np.logical_and(m.data[0, :] >= 0, m.data[0, :] <= 180)]
 
     return measurements_condensed
 
@@ -107,7 +109,6 @@ def sort_measurements_by_energy(all_entries, min_num_pts=5):
             if measurement.data.shape[1] > min_num_pts:
                 measurements.append(measurement)
     return sort_measurement_list(measurements, min_num_pts=min_num_pts)
-
 
 
 # these are the supported quantities at the moment
@@ -372,7 +373,6 @@ class ExforDifferentialData:
                 "year": data_sets[0].year,
                 "institute": data_sets[0].institute,
             }
-
 
     def plot_experiment(
         self,
