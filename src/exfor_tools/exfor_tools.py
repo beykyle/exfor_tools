@@ -13,6 +13,11 @@ def init_exfor_db():
     if __EXFOR_DB__ is None:
         __EXFOR_DB__ = exfor_manager.X4DBManagerDefault()
 
+def get_db():
+    global __EXFOR_DB__
+    if __EXFOR_DB__ is None:
+        init_exfor_db()
+    return __EXFOR_DB__
 
 def get_exfor_differential_data(
     target, projectile, quantity, energy_range=None, product=None
@@ -63,20 +68,8 @@ def get_exfor_differential_data(
     return data_sets
 
 
-def sort_measurements_by_energy(all_entries, min_num_pts=5):
-    r"""Given a dictionary form EXFOR entry number to ExforDifferentialData,
-    grabs all the ExforDifferentialDataSet's and sorts them by energy,
-    concatenating ones that are at the same energy
-    """
-    measurements = []
-    energies = []
-    for entry, data in all_entries.items():
-        for measurement in data.measurements:
-            if measurement.data.shape[1] > min_num_pts:
-                energies.append(measurement.Elab)
-                measurements.append(measurement)
-
-    energies = np.array(energies)
+def sort_measurement_list(measurements, min_num_pts=5):
+    energies = np.array([m.Elab for m in measurements])
     energies_sorted = energies[np.argsort(energies)]
     measurements_sorted = [measurements[i] for i in np.argsort(energies)]
     vals, idx, cnt = np.unique(energies_sorted, return_counts=True, return_index=True)
@@ -94,27 +87,34 @@ def sort_measurements_by_energy(all_entries, min_num_pts=5):
 
         measurements_condensed.append(
             ExforDifferentialDataSet(
-                m.entry,
-                m.subentry,
-                m.Elab,
-                m.dElab,
-                m.energy_units,
-                m.units,
-                m.labels,
-                data,
+                m.Elab, m.dElab, m.energy_units, m.units, m.labels, data
             )
         )
+
+    # sanitize
+    for m in measurements_condensed:
+        m.data = m.data[:,m.data[0,:].argsort()]
+        m.data = m.data[:,  np.logical_and(m.data[0,:] >= 0 , m.data[0,:] <= 180) ]
+
     return measurements_condensed
 
 
-# TODO change product to reaction in all inputs
+def sort_measurements_by_energy(all_entries, min_num_pts=5):
+    r"""given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all the ExforDifferentialDataSet's and sorts them by energy, concatenating ones that are at the same energy"""
+    measurements = []
+    for entry, data in all_entries.items():
+        for measurement in data.measurements:
+            if measurement.data.shape[1] > min_num_pts:
+                measurements.append(measurement)
+    return sort_measurement_list(measurements, min_num_pts=min_num_pts)
 
-reactions = ["QE (p,n)", "(p,p)", "(n,n)"]
+
 
 # these are the supported quantities at the moment
 # XS = cross section, A = angle, Ruth = Rutherford cross section, Ay = analyzing power
+# TODO add DE (differential with energy)
 quantity_matches = {
-    "dXS/dA": [["DA"]],  # TODO add PAR
+    "dXS/dA": [["DA"]],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
     "Ay": [["POL/DA", "ANA"]],
 }
@@ -149,10 +149,118 @@ unit_conversions = dict(
 )
 
 
+def get_measurements_from_subentry(
+    energy_range,
+    data_set,
+    common_energy=None,
+    common_energy_uncertainty=None,
+):
+    r"""unrolls subentry into individual arrays for each energy"""
+    data_array = np.array(data_set.data)
+
+    # TODO in the case that number of unique energies > number of angles,
+    # then store as single-angle data sets for a range of energies
+
+    # sanitize labels and convert units
+    for i in range(len(data_set.labels)):
+        if data_set.labels[i] in label_matches:
+            data_set.labels[i] = label_matches[data_set.labels[i]]
+        if data_set.units[i] in unit_conversions:
+            conversion, data_set.units[i] = unit_conversions[data_set.units[i]]
+
+            # sanitization of missing data
+            mask = data_array[:, i] == None
+            data_array[mask, i] = 0
+
+            # unit conversion
+            data_array[:, i] *= conversion
+
+    # these fields are mandatory
+    if "Angle" not in data_set.labels:
+        raise ValueError("Missing 'Angle' field!")
+        # TODO allow for momentum transfer as well as angle
+    if "Data" not in data_set.labels:
+        raise ValueError("Missing 'Data' field!")
+
+    xi = np.argmax(np.array(data_set.labels) == "Angle")
+    yi = np.argmax(np.array(data_set.labels) == "Data")
+    x = data_array[:, xi]
+    y = data_array[:, yi]
+
+    # these fields are optional
+    if "d(Data)" in data_set.labels:
+        dyi = np.argmax(np.array(data_set.labels) == "d(Data)")
+        dy = data_array[:, dyi]
+        if data_set.units[yi] != data_set.units[dyi]:
+            raise ValueError(
+                "Inconsistent units between 'Data' and 'd(Data)' fields :"
+                + f"{data_set.units[yi]} and {data_set.units[dyi]}"
+            )
+    else:
+        dy = np.zeros(len(x))
+
+    if "d(Angle)" in data_set.labels:
+        dxi = np.argmax(np.array(data_set.labels) == "d(Angle)")
+        dx = data_array[:, dxi]
+        if data_set.units[xi] != data_set.units[dxi]:
+            raise ValueError(
+                "Inconsistent units between 'Angle' and 'd(Angle)' fields :"
+                + f"{data_set.units[xi]} and {data_set.units[dxi]}"
+            )
+    else:
+        dx = np.zeros(len(x))
+
+    # put em all together
+    all_data = np.vstack([x, dx, y, dy])
+    labels = [data_set.labels[xi], data_set.labels[yi]]
+    units = [data_set.units[xi], data_set.units[yi]]
+
+    # split up data by energy (if applicable)
+    energy_errs = []
+    energies = []
+    measurements = []
+
+    if "Energy" in data_set.labels:
+        e_idx = np.argmax(np.array(data_set.labels) == "Energy")
+        energy_units = data_set.units[e_idx]
+
+        for energy in np.unique(data_array[:, e_idx]):
+            mask = data_array[:, e_idx] == energy
+            energies.append(energy)
+            measurements.append(np.copy(all_data[:, mask]))
+
+        # TODO x4i3 gives the wrong error in energy sometimes?
+        if "d(Energy)" in data_set.labels:
+            de_idx = np.argmax(np.array(data_set.labels) == "d(Energy)")
+            for energy in np.unique(data_array[:, e_idx]):
+                mask = data_array[:, e_idx] == energy
+                energy_errs.append(data_array[mask, de_idx][0])
+
+        else:
+            if common_energy_uncertainty is None:
+                energy_errs = np.zeros(len(energies))
+            else:
+                energy_errs = np.ones(len(energies)) * common_energy_uncertainty
+
+    else:
+        # no need to split into energies, it's all in one
+        energies = [common_energy]
+        energy_errs = [common_energy_uncertainty]
+        measurements = [all_data]
+
+    # sort by energy
+    sorted_data = sorted(zip(energies, energy_errs, measurements))
+    return [
+        ExforDifferentialDataSet(
+            energy, energy_err, energy_units, units, labels, measurement
+        )
+        for energy, energy_err, measurement in sorted_data
+        if energy >= energy_range[0] and energy < energy_range[1]
+    ]
+
+
 class ExforDifferentialDataSet:
-    def __init__(self, entry, subentry, Elab, dElab, energy_units, units, labels, data):
-        self.entry = entry
-        self.subentry = subentry
+    def __init__(self, Elab, dElab, energy_units, units, labels, data):
         self.Elab = Elab
         self.dElab = dElab
         self.energy_units = energy_units
@@ -242,8 +350,8 @@ class ExforDifferentialData:
                     and products == self.products
                 ):
                     data_sets.append(data_set)
-                    measurements = self.get_measurements_from_subentry(
-                        key,
+                    measurements = get_measurements_from_subentry(
+                        self.energy_range,
                         data_set,
                         common_energy=common_energy,
                         common_energy_uncertainty=common_energy_uncertainty,
@@ -265,122 +373,6 @@ class ExforDifferentialData:
                 "institute": data_sets[0].institute,
             }
 
-    def get_measurements_from_subentry(
-        self,
-        subentry,
-        data_set,
-        common_energy=None,
-        common_energy_uncertainty=None,
-    ):
-        r"""unrolls subentry into individual arrays for each energy"""
-        data_array = np.array(data_set.data)
-
-        # TODO in the case that number of unique energies > number of angles,
-        # then store as single-angle data sets for a range of energies
-
-        # sanitize labels and convert units
-        for i in range(len(data_set.labels)):
-            if data_set.labels[i] in label_matches:
-                data_set.labels[i] = label_matches[data_set.labels[i]]
-            if data_set.units[i] in unit_conversions:
-                conversion, data_set.units[i] = unit_conversions[data_set.units[i]]
-
-                # sanitization of missing data
-                mask = data_array[:, i] == None
-                data_array[mask, i] = 0
-
-                # unit conversion
-                data_array[:, i] *= conversion
-
-        # these fields are mandatory
-        if "Angle" not in data_set.labels:
-            raise ValueError("Missing 'Angle' field!")
-            # TODO allow for momentum transfer as well as angle
-        if "Data" not in data_set.labels:
-            raise ValueError("Missing 'Data' field!")
-
-        xi = np.argmax(np.array(data_set.labels) == "Angle")
-        yi = np.argmax(np.array(data_set.labels) == "Data")
-        x = data_array[:, xi]
-        y = data_array[:, yi]
-
-        # these fields are optional
-        if "d(Data)" in data_set.labels:
-            dyi = np.argmax(np.array(data_set.labels) == "d(Data)")
-            dy = data_array[:, dyi]
-            if data_set.units[yi] != data_set.units[dyi]:
-                raise ValueError(
-                    "Inconsistent units between 'Data' and 'd(Data)' fields :"
-                    + f"{data_set.units[yi]} and {data_set.units[dyi]}"
-                )
-        else:
-            dy = np.zeros(len(x))
-
-        if "d(Angle)" in data_set.labels:
-            dxi = np.argmax(np.array(data_set.labels) == "d(Angle)")
-            dx = data_array[:, dxi]
-            if data_set.units[xi] != data_set.units[dxi]:
-                raise ValueError(
-                    "Inconsistent units between 'Angle' and 'd(Angle)' fields :"
-                    + f"{data_set.units[xi]} and {data_set.units[dxi]}"
-                )
-        else:
-            dx = np.zeros(len(x))
-
-        # put em all together
-        all_data = np.vstack([x, dx, y, dy])
-        labels = [data_set.labels[xi], data_set.labels[yi]]
-        units = [data_set.units[xi], data_set.units[yi]]
-
-        # split up data by energy (if applicable)
-        energy_errs = []
-        energies = []
-        measurements = []
-
-        if "Energy" in data_set.labels:
-            e_idx = np.argmax(np.array(data_set.labels) == "Energy")
-            energy_units = data_set.units[e_idx]
-
-            for energy in np.unique(data_array[:, e_idx]):
-                mask = data_array[:, e_idx] == energy
-                energies.append(energy)
-                measurements.append(np.copy(all_data[:, mask]))
-
-            # TODO x4i3 gives the wrong error in energy sometimes?
-            if "d(Energy)" in data_set.labels:
-                de_idx = np.argmax(np.array(data_set.labels) == "d(Energy)")
-                for energy in np.unique(data_array[:, e_idx]):
-                    mask = data_array[:, e_idx] == energy
-                    energy_errs.append(data_array[mask, de_idx][0])
-
-            else:
-                if common_energy_uncertainty is None:
-                    energy_errs = np.zeros(len(energies))
-                else:
-                    energy_errs = np.ones(len(energies)) * common_energy_uncertainty
-
-        else:
-            # no need to split into energies, it's all in one
-            energies = [common_energy]
-            energy_errs = [common_energy_uncertainty]
-            measurements = [all_data]
-
-        # sort by energy
-        sorted_data = sorted(zip(energies, energy_errs, measurements))
-        return [
-            ExforDifferentialDataSet(
-                self.entry,
-                subentry,
-                energy,
-                energy_err,
-                energy_units,
-                units,
-                labels,
-                measurement,
-            )
-            for energy, energy_err, measurement in sorted_data
-            if energy >= self.energy_range[0] and energy < self.energy_range[1]
-        ]
 
     def plot_experiment(
         self,
@@ -415,11 +407,11 @@ class ExforDifferentialData:
 
         # plot each measurement and add a label
         for offset, m in zip(offsets, measurements):
-            # plot the data
-            x = np.copy(m.data[0, :])
-            dx = np.copy(m.data[1, :])
-            y = np.copy(m.data[2, :])
-            dy = np.copy(m.data[3, :])
+            # copy the data into a big as hell float to handle big offsets
+            x = np.copy(m.data[0, :]).astype(np.longdouble)
+            dx = np.copy(m.data[1, :]).astype(np.longdouble)
+            y = np.copy(m.data[2, :]).astype(np.longdouble)
+            dy = np.copy(m.data[3, :]).astype(np.longdouble)
             if log:
                 y *= offset
                 dy *= offset
@@ -429,7 +421,7 @@ class ExforDifferentialData:
             ax.errorbar(x, y, yerr=dy, xerr=dx, color="k", linestyle="None", marker=".")
 
             if add_baseline:
-                ax.plot(xlim, [offset, offset], "k--", alpha=0.5)
+                ax.plot([0, 180], [offset, offset], "k--", alpha=0.5)
 
             hloc_deg = label_hloc_deg
             yloc_deg = np.mean(y[np.argmin(np.fabs(x - hloc_deg)) :])
