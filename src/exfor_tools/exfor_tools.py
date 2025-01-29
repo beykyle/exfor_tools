@@ -84,7 +84,7 @@ def sort_measurement_list(measurements, min_num_pts=5):
             [m.data] + [measurements_sorted[i + j].data for j in range(1, c)]
         )
 
-        # re-sort data by anglwe
+        # re-sort data by angle
         data = data[:, data[0, :].argsort()]
 
         measurements_condensed.append(
@@ -103,9 +103,9 @@ def sort_measurement_list(measurements, min_num_pts=5):
 
 def sort_measurements_by_energy(all_entries, min_num_pts=5):
     r"""
-        Given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all
-        the ExforDifferentialDataSet's and sorts them by energy, concatenating ones
-        that are at the same energy
+    Given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all
+    the ExforDifferentialDataSet's and sorts them by energy, concatenating ones
+    that are at the same energy
     """
     measurements = []
     for entry, data in all_entries.items():
@@ -412,10 +412,10 @@ class ExforDifferentialData:
         # plot each measurement and add a label
         for offset, m in zip(offsets, measurements):
             # copy the data into a big as hell float to handle big offsets
-            x = np.copy(m.data[0, :]).astype(np.longdouble)
-            dx = np.copy(m.data[1, :]).astype(np.longdouble)
-            y = np.copy(m.data[2, :]).astype(np.longdouble)
-            dy = np.copy(m.data[3, :]).astype(np.longdouble)
+            x = np.copy(m.data[0, :])
+            dx = np.copy(m.data[1, :])
+            y = np.copy(m.data[2, :])
+            dy = np.copy(m.data[3, :])
             if log:
                 y *= offset
                 dy *= offset
