@@ -102,7 +102,11 @@ def sort_measurement_list(measurements, min_num_pts=5):
 
 
 def sort_measurements_by_energy(all_entries, min_num_pts=5):
-    r"""given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all the ExforDifferentialDataSet's and sorts them by energy, concatenating ones that are at the same energy"""
+    r"""
+        Given a dictionary form EXFOR entry number to ExforDifferentialData, grabs all
+        the ExforDifferentialDataSet's and sorts them by energy, concatenating ones
+        that are at the same energy
+    """
     measurements = []
     for entry, data in all_entries.items():
         for measurement in data.measurements:
