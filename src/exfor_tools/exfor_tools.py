@@ -390,6 +390,7 @@ class ExforDifferentialData:
         xlim=[0, 180],
         label_energy_err=True,
         label_offset=True,
+        fontsize=10,
     ):
         if measurements is None:
             measurements = self.measurements
@@ -449,7 +450,7 @@ class ExforDifferentialData:
             ax.text(
                 *label_location,
                 label,
-                fontsize=8,
+                fontsize=fontsize,
             )
 
         ax.set_xlabel(r"$\theta$ [{}]".format(units_x))
