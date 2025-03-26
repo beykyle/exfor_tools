@@ -449,7 +449,8 @@ def get_measurements_from_subentry(
 
         if elastic_only:
             measurements.append(
-                (Einc, Einc_err), AngularDistribution(subentry, data[4:, mask], Einc,Einc_err,0,0)
+                (Einc, Einc_err),
+                AngularDistribution(subentry, data[4:, mask], Einc, Einc_err, 0, 0),
             )
         else:
             measurements.append((Einc, Einc_err), [])
@@ -462,14 +463,24 @@ def get_measurements_from_subentry(
             for Ex in np.sort(unique_Ex):
                 mask = np.isclose(subset[0, :], Ex)
                 Ex_err = subset[1, mask][0]
-                measurement = AngularDistribution(subentry, subset[2:, mask], Einc,Einc_err, Ex, Ex_err)
+                measurement = AngularDistribution(
+                    subentry, subset[2:, mask], Einc, Einc_err, Ex, Ex_err
+                )
                 measurements[-1][1].append(((Ex, Ex_err), measurement))
 
     return measurements
 
 
 class AngularDistribution:
-    def __init__(self, subentry: str, data: np.array, Einc : float, Einc_err : float, Ex : float, Ex_err : float):
+    def __init__(
+        self,
+        subentry: str,
+        data: np.array,
+        Einc: float,
+        Einc_err: float,
+        Ex: float,
+        Ex_err: float,
+    ):
         self.subentry = subentry
         self.data = data
         self.Einc = Einc
@@ -562,7 +573,7 @@ class ExforEntryAngularDistribution:
         for key, data_set in entry_datasets.items():
 
             if isinstance(data_set.reaction[0], X4Reaction):
-                #TODO need to do like EL for product for elastic or something stupid like that?
+                # TODO need to do like EL for product for elastic or something stupid like that?
                 isotope = (
                     data_set.reaction[0].targ.getA(),
                     data_set.reaction[0].targ.getZ(),
