@@ -336,7 +336,7 @@ def parse_inc_energy(subentry):
 
 
 def parse_angular_distribution(
-    subentry: x4i3.exfor_dataset.X4AngularDistributionDataSet,
+    data_set,
     data_error_columns=None,
     err_treatment="independent",
 ):
@@ -350,17 +350,17 @@ def parse_angular_distribution(
         data_error_columns = [b + "-ERR" for b in baseDataKeys] + dataTotalErrorKeys
 
     # parse angle
-    angle, angle_err = parse_angle(subentry)
+    angle, angle_err = parse_angle(data_set)
 
     # parse energy if it's present
-    E_inc_cm, E_inc_cm_err = parse_inc_energy(subentry)
+    E_inc_cm, E_inc_cm_err = parse_inc_energy(data_set)
 
     # parse excitation energy if it's present
-    E_ex, E_ex_err = parse_ex_energy(subentry)
+    E_ex, E_ex_err = parse_ex_energy(data_set)
 
     # parse diff xs
     xs, xs_err = parse_differential_data(
-        subentry, data_error_columns=data_error_columns, err_treatment=err_treatment
+        data_set, data_error_columns=data_error_columns, err_treatment=err_treatment
     )
 
     return E_inc_cm, E_inc_cm_err, E_ex, E_ex_err, angle, angle_err, xs, xs_err
@@ -415,7 +415,7 @@ def get_measurements_from_subentry(
         )
     )
 
-    N = subentry.numrows()
+    N = data_set.numrows()
     data = np.zeros((6, N))
 
     data[:, :] = [
@@ -443,16 +443,16 @@ def get_measurements_from_subentry(
     unique_Einc = np.unique(data[0, :])
 
     # sort and fragment data by unique incident energy
-    for E in np.sort(unique_Einc):
-        mask = np.isclose(data[0, :], E)
+    for Einc in np.sort(unique_Einc):
+        mask = np.isclose(data[0, :], Einc)
         Einc_err = data[1, mask][0]
 
         if elastic_only:
             measurements.append(
-                (E, Einc_err), AngularDistribution(subentry, data[4:, mask])
+                (Einc, Einc_err), AngularDistribution(subentry, data[4:, mask], Einc,Einc_err,0,0)
             )
         else:
-            measurements.append((E, Einc_err), [])
+            measurements.append((Einc, Einc_err), [])
             subset = data[2:, mask]
 
             # find set of unique residual excitation energies
@@ -462,16 +462,20 @@ def get_measurements_from_subentry(
             for Ex in np.sort(unique_Ex):
                 mask = np.isclose(subset[0, :], Ex)
                 Ex_err = subset[1, mask][0]
-                measurement = AngularDistribution(subentry, subset[2:, mask])
+                measurement = AngularDistribution(subentry, subset[2:, mask], Einc,Einc_err, Ex, Ex_err)
                 measurements[-1][1].append(((Ex, Ex_err), measurement))
 
     return measurements
 
 
 class AngularDistribution:
-    def __init__(self, subentry: str, data: np.array):
+    def __init__(self, subentry: str, data: np.array, Einc : float, Einc_err : float, Ex : float, Ex_err : float):
         self.subentry = subentry
         self.data = data
+        self.Einc = Einc
+        self.Einc_err = Einc_err
+        self.Ex = Ex
+        self.Ex_err = Ex_err
 
 
 def get_symbol(A, Z, Ex=None):
@@ -558,6 +562,7 @@ class ExforEntryAngularDistribution:
         for key, data_set in entry_datasets.items():
 
             if isinstance(data_set.reaction[0], X4Reaction):
+                #TODO need to do like EL for product for elastic or something stupid like that?
                 isotope = (
                     data_set.reaction[0].targ.getA(),
                     data_set.reaction[0].targ.getZ(),
