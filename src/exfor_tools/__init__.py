@@ -3,8 +3,8 @@ from .exfor_tools import (
     sort_measurements_by_energy,
     sort_measurement_list,
     get_measurements_from_subentry,
-    ExforDifferentialData,
-    ExforDifferentialDataSet,
+    ExforEntryAngularDistribution,
+    AngularDistribution,
     init_exfor_db,
     get_db,
 )
