@@ -976,9 +976,9 @@ def set_label(
     label_location = (label_xloc_deg, label_yloc)
 
     if log:
-        offset_text = f"($\\times$ {offset:0.0e})"
+        offset_text = f"($\\times$ {offset:0e})"
     else:
-        offset_text = f"($+$ {offset:1.0f})"
+        offset_text = f"($+$ {offset:1f})"
 
     m = measurements[0]
     label = ""
@@ -1000,7 +1000,7 @@ def set_label(
             else:
                 label += f"{m.subentry}, "
     if label_offset:
-        label += "\n" + offset_text
+        label += offset_text
 
     t = ax.text(*label_location, label, fontsize=fontsize, color=colors[-1])
 
@@ -1088,8 +1088,12 @@ def plot_angular_distributions(
             set_label(ax, m, c, offset, x, y, log, fontsize, **label_kwargs)
 
     if isinstance(measurements[0], list):
-        x_units = measurements[0][0].x_units
-        y_units = measurements[0][0].y_units
+        x_units = unit_symbols.get(
+            measurements[0][0].x_units, measurements[0][0].x_units
+        )
+        y_units = unit_symbols.get(
+            measurements[0][0].y_units, measurements[0][0].y_units
+        )
     else:
         x_units = unit_symbols.get(measurements[0].x_units, measurements[0].x_units)
         y_units = unit_symbols.get(measurements[0].y_units, measurements[0].y_units)
