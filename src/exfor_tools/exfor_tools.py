@@ -1,12 +1,8 @@
 import numpy as np
 import periodictable
 from functools import reduce
-import matplotlib
-from matplotlib import rc
-
 import jitr.utils.mass as mass
 
-import x4i3
 from x4i3 import exfor_manager
 from x4i3.exfor_reactions import X4Reaction
 from x4i3.exfor_column_parsing import (
@@ -228,7 +224,7 @@ def find_unique_elements_with_tolerance(arr, tolerance):
     return unique_elements, idx_sets
 
 
-def categorize_measurement_list(measurements, min_num_pts=5, Einc_fudge_factor=0.1):
+def categorize_measurement_list(measurements, min_num_pts=5, Einc_tol=0.1):
     """
     Categorize a list of measurements by unique incident energy.
 
@@ -236,7 +232,7 @@ def categorize_measurement_list(measurements, min_num_pts=5, Einc_fudge_factor=0
     measurements (list): A list of `AngularDistribution`s
     min_num_pts (int, optional): Minimum number of points for a valid
         measurement group. Default is 5.
-    Einc_fudge_factor (float, optional): Tolerance for considering energies
+    Einc_tol (float, optional): Tolerance for considering energies
         as identical. Default is 0.1.
 
     Returns:
@@ -244,9 +240,7 @@ def categorize_measurement_list(measurements, min_num_pts=5, Einc_fudge_factor=0
         measurements with similar incident energy.
     """
     energies = np.array([m.Einc for m in measurements])
-    unique_energies, idx_sets = find_unique_elements_with_tolerance(
-        energies, Einc_fudge_factor
-    )
+    unique_energies, idx_sets = find_unique_elements_with_tolerance(energies, Einc_tol)
     unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets)))
 
     sorted_measurements = []
@@ -257,9 +251,7 @@ def categorize_measurement_list(measurements, min_num_pts=5, Einc_fudge_factor=0
     return sorted_measurements
 
 
-def categorize_measurements_by_energy(
-    all_entries, min_num_pts=5, Einc_fudge_factor=0.1
-):
+def categorize_measurements_by_energy(all_entries, min_num_pts=5, Einc_tol=0.1):
     r"""
     Given a dictionary form EXFOR entry number to ExforEntryAngularDistribution, grabs all
     the ExforEntryAngularDistributionSet's and sorts them by energy, concatenating ones
@@ -271,7 +263,9 @@ def categorize_measurements_by_energy(
         for measurement in data.measurements:
             if measurement.data.shape[1] > min_num_pts:
                 measurements.append(measurement)
-    return categorize_measurement_list(measurements, min_num_pts=min_num_pts)
+    return categorize_measurement_list(
+        measurements, min_num_pts=min_num_pts, Einc_tol=Einc_tol
+    )
 
 
 def parse_differential_data(
@@ -794,8 +788,8 @@ class ExforEntryAngularDistribution:
 
         if len(self.residual) == 3:
             self.Ex_prime = self.residual[2]
-            ex_fudge = 0.01
-            Ex_range = (self.Ex_prime - ex_fudge, self.Ex_prime + ex_fudge)
+            ex_tol = 0.01
+            Ex_range = (self.Ex_prime - ex_tol, self.Ex_prime + ex_tol)
 
         Apre = self.target[0] + self.projectile[0]
         Apost = self.residual[0] + self.product[0]
