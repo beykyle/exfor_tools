@@ -1,6 +1,10 @@
 import numpy as np
 import periodictable
 from functools import reduce
+import matplotlib
+from matplotlib import rc
+
+import jitr.utils.mass as mass
 
 import x4i3
 from x4i3 import exfor_manager
@@ -51,8 +55,8 @@ quantity_matches = {
 
 quantity_symbols = {
     ("DA",): r"$\frac{d\sigma}{d\Omega}$",
-    ("DA", "RTH"): r"$\sigma / \sigma_{R}$",
-    ("DA", "RTH/REL"): r"$\sigma / \sigma_{R}$",
+    ("DA", "RTH"): r"$\sigma / \sigma_{Rutherford}$",
+    ("DA", "RTH/REL"): r"$\sigma / \sigma_{Rutherford}$",
     ("POL/DA", "ANA"): r"$A_y$",
 }
 
@@ -121,15 +125,26 @@ def sanitize_column(col):
 
 
 def get_exfor_differential_data(
-    target,
-    projectile,
-    quantity,
-    product,
-    residual,
-    energy_range=None,
+    target: tuple,
+    projectile: tuple,
+    quantity: str,
+    residual: tuple = None,
+    product: tuple = None,
+    special_rxn_type="",
+    Einc_range: tuple = None,
+    Ex_range: tuple = None,
+    suppress_numbered_errs=True,
+    mass_args={},
+    vocal=False,
+    filter_subentries=lambda subentry: subentry.rows > 2 and len(subentry.labels) > 2,
 ):
     r"""query EXFOR for all entries satisfying search criteria, and return them
     as a dictionary of entry number to ExforEntryAngularDistribution"""
+
+    ## TODO print out all subentries and their column labels first, flagging any which have weird errors
+    ## return list of flagged entries
+    ## construct an entry object for each flagged entry one by one, using custom error handling
+    ## allow to pass in an error handling lambda into ctor
     A, Z = target
     target_symbol = f"{str(periodictable.elements[Z])}-{A}"
 
@@ -146,27 +161,33 @@ def get_exfor_differential_data(
         projectile_symbol = "A"
     else:
         projectile_symbol = f"{str(periodictable.elements[Z])}-{A}"
-    if product is None:
-        product = "*"
 
-    reaction = f"{projectile_symbol},{product}"
     exfor_quantity = quantity_matches[quantity][0][0]
     entries = __EXFOR_DB__.query(
-        reaction=reaction, quantity=exfor_quantity, target=target_symbol
+        quantity=exfor_quantity,
+        target=target_symbol,
+        projectile=projectile_symbol,
     ).keys()
 
     data_sets = {}
     for entry in entries:
         try:
             data_set = ExforEntryAngularDistribution(
-                entry=entry,
-                target=target,
-                projectile=projectile,
-                quantity=quantity,
-                residual=residual,
-                product=product,
-                energy_range=energy_range,
+                entry,
+                target,
+                projectile,
+                quantity,
+                residual,
+                product,
+                special_rxn_type,
+                Einc_range,
+                Ex_range,
+                suppress_numbered_errs,
+                mass_args,
+                vocal,
+                filter_subentries,
             )
+
         except ValueError as e:
             print(f"There was an error reading entry {entry}, it will be skipped:")
             print(e)
@@ -176,54 +197,85 @@ def get_exfor_differential_data(
     return data_sets
 
 
-def sort_measurement_list(measurements, min_num_pts=5):
-    # TODO don't condense, instead store a map from unique measurement conditions to list of AngularDistributions
-    energies = np.array([m.Elab for m in measurements])
-    energies_sorted = energies[np.argsort(energies)]
-    measurements_sorted = [measurements[i] for i in np.argsort(energies)]
-    vals, idx, cnt = np.unique(energies_sorted, return_counts=True, return_index=True)
-    measurements_condensed = []
-    for i, c in zip(idx, cnt):
-        m = measurements_sorted[i]
+def find_unique_elements_with_tolerance(arr, tolerance):
+    """
+    Identify unique elements in an array within a specified tolerance.
 
-        # concatenate data for all sets at the same energy
-        data = np.hstack(
-            [m.data] + [measurements_sorted[i + j].data for j in range(1, c)]
-        )
+    Parameters:
+    arr (list or array-like): The input array to process.
+    tolerance (float): The tolerance within which elements are considered identical.
 
-        # re-sort data by angle
-        data = data[:, data[0, :].argsort()]
+    Returns:
+    unique_elements (list):
+    idx_sets (list): a list of sets, each entry corresponding to the indices to array
+        that arre within tolerance of the corresponding entry in unique_elements
+    """
+    unique_elements = []
+    idx_sets = []
 
-        measurements_condensed.append(
-            AngularDistribution(
-                m.Elab, m.dElab, m.energy_units, m.units, m.labels, data
-            )
-        )
+    for idx, value in enumerate(arr):
+        found = False
+        for i, unique_value in enumerate(unique_elements):
+            if abs(value - unique_value) <= tolerance:
+                idx_sets[i].add(idx)
+                found = True
+                break
 
-    # sanitize
-    for m in measurements_condensed:
-        m.data = m.data[:, m.data[0, :].argsort()]
-        m.data = m.data[:, np.logical_and(m.data[0, :] >= 0, m.data[0, :] <= 180)]
+        if not found:
+            unique_elements.append(value)
+            idx_sets.append({idx})
 
-    return measurements_condensed
+    return unique_elements, idx_sets
 
 
-def sort_measurements_by_energy(all_entries, min_num_pts=5):
+def categorize_measurement_list(measurements, min_num_pts=5, Einc_fudge_factor=0.1):
+    """
+    Categorize a list of measurements by unique incident energy.
+
+    Parameters:
+    measurements (list): A list of `AngularDistribution`s
+    min_num_pts (int, optional): Minimum number of points for a valid
+        measurement group. Default is 5.
+    Einc_fudge_factor (float, optional): Tolerance for considering energies
+        as identical. Default is 0.1.
+
+    Returns:
+    sorted_measurements (list): A list of lists, where each sublist contains
+        measurements with similar incident energy.
+    """
+    energies = np.array([m.Einc for m in measurements])
+    unique_energies, idx_sets = find_unique_elements_with_tolerance(
+        energies, Einc_fudge_factor
+    )
+    unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets)))
+
+    sorted_measurements = []
+    for idx_set in idx_sets:
+        group = [measurements[idx] for idx in idx_set]
+        sorted_measurements.append(group)
+
+    return sorted_measurements
+
+
+def categorize_measurements_by_energy(
+    all_entries, min_num_pts=5, Einc_fudge_factor=0.1
+):
     r"""
     Given a dictionary form EXFOR entry number to ExforEntryAngularDistribution, grabs all
     the ExforEntryAngularDistributionSet's and sorts them by energy, concatenating ones
     that are at the same energy
     """
+    # TODO handle duplicate entries
     measurements = []
     for entry, data in all_entries.items():
         for measurement in data.measurements:
             if measurement.data.shape[1] > min_num_pts:
                 measurements.append(measurement)
-    return sort_measurement_list(measurements, min_num_pts=min_num_pts)
+    return categorize_measurement_list(measurements, min_num_pts=min_num_pts)
 
 
 def parse_differential_data(
-    subentry, data_error_columns=["DATA-ERR"], err_treatment="independent"
+    data_set, data_error_columns=["DATA-ERR"], err_treatment="independent"
 ):
     r"""
     Extract differential cross section (potentially as ratio to Rutherford)
@@ -235,11 +287,11 @@ def parse_differential_data(
         ),
         match_units=angDistUnits + noUnits,
     )
-    match_idxs = data_parser.allMatches(subentry)
+    match_idxs = data_parser.allMatches(data_set)
     if len(match_idxs) != 1:
         raise ValueError(f"Expected only one DATA column, found {len(match_idxs)}")
     iy = match_idxs[0]
-    data_column = data_parser.getColumn(iy, subentry)
+    data_column = data_parser.getColumn(iy, data_set)
     xs_units = data_column[1]
     xs = np.array(data_column[2:], dtype=np.float64)
 
@@ -255,9 +307,9 @@ def parse_differential_data(
             ),
             match_units=angDistUnits + percentUnits + noUnits,
         )
-        icol = err_parser.firstMatch(subentry)
+        icol = err_parser.firstMatch(data_set)
         if icol >= 0:
-            err = err_parser.getColumn(icol, subentry)
+            err = err_parser.getColumn(icol, data_set)
             err_units = err[1]
             err_data = np.array(sanitize_column(err[2:]), dtype=np.float64)
             # convert to same units as data
@@ -287,83 +339,147 @@ def parse_differential_data(
             )
         xs_err = err_col_match[0] - err_col_match[1]
 
-    return xs, xs_err
+    return xs, xs_err, xs_units
 
 
 # TODO handle Q-value and level number
-def parse_ex_energy(subentry):
-    E_inc_cm = np.array(
-        reduce(condenseColumn, [c.getValue(subentry) for c in energyExParserList])[2:],
+def parse_ex_energy(data_set):
+    Ex = reduce(condenseColumn, [c.getValue(data_set) for c in energyExParserList])
+
+    missing_Ex = np.all([a is None for a in Ex[2:]])
+    Ex_units = Ex[1]
+
+    Ex = np.array(
+        Ex[2:],
         dtype=np.float64,
     )
-    E_inc_cm_err = np.array(
-        reduce(condenseColumn, [c.getError(subentry) for c in energyExParserList])[2:],
+    if missing_Ex:
+        return Ex, Ex, None
+
+    if Ex[0][-3:] == "-CM":
+        raise NotImplementedError("Incident energy in CM frame!")
+
+    Ex_err = reduce(condenseColumn, [c.getError(data_set) for c in energyExParserList])
+    if Ex_err[1] != Ex_units:
+        raise ValueError(
+            f"Inconsistent units for Ex and Ex error: {Ex_units} and {Ex_err[1]}"
+        )
+    Ex_err = np.array(
+        Ex_err[2:],
         dtype=np.float64,
     )
-    return E_inc_cm, E_inc_cm_err
+
+    return Ex, Ex_err, Ex_units
 
 
-def parse_angle(subentry):
-    angle = reduce(condenseColumn, [c.getValue(subentry) for c in angleParserList])
+def parse_angle(data_set):
+    # TODO handle cosine or momentum transfer
+    # TODO how does this handle multiple matched entries
+    angle = reduce(condenseColumn, [c.getValue(data_set) for c in angleParserList])
     if angle[1] != "degrees":
         raise ValueError(f"Cannot parse angle in units of {angle[1]}")
-    angle = np.array(angle[2:])
-
-    angle_err = reduce(condenseColumn, [c.getError(subentry) for c in angleParserList])
-    if angle_err[1] != "degrees":
-        raise ValueError(f"Cannot parse angle error in units of {angle_err[1]}")
-    angle_err = np.array(angle_err[2:])
-    return angle, angle_err
-
-
-def parse_inc_energy(subentry):
-    if subentry.referenceFrame != "Center of mass":
-        raise NotImplementedError("Conversions from lab frame not implemented")
-
-    E_inc_cm = np.array(
-        reduce(
-            condenseColumn, [c.getValue(subentry) for c in incidentEnergyParserList]
-        )[2:],
+    if angle[0][-3:] != "-CM":
+        raise NotImplementedError("Angle in lab frame!")
+    angle = np.array(
+        angle[2:],
         dtype=np.float64,
     )
-    E_inc_cm_err = np.array(
-        reduce(
-            condenseColumn, [c.getError(subentry) for c in incidentEnergyParserList]
-        )[2:],
+    angle_err = reduce(condenseColumn, [c.getError(data_set) for c in angleParserList])
+    missing_err = np.all([a is None for a in angle_err[2:]])
+    if not missing_err:
+        if angle_err[1] != "degrees":
+            raise ValueError(f"Cannot parse angle error in units of {angle_err[1]}")
+    angle_err = np.array(
+        angle_err[2:],
         dtype=np.float64,
     )
-    return E_inc_cm, E_inc_cm_err
+    return angle, angle_err, "degrees"
+
+
+def parse_inc_energy(data_set):
+    Einc_lab = reduce(
+        condenseColumn, [c.getValue(data_set) for c in incidentEnergyParserList]
+    )
+
+    Einc_units = Einc_lab[1]
+    if Einc_lab[0][-3:] == "-CM":
+        raise NotImplementedError("Incident energy in CM frame!")
+
+    Einc_lab = np.array(
+        Einc_lab[2:],
+        dtype=np.float64,
+    )
+
+    Einc_lab_err = reduce(
+        condenseColumn, [c.getError(data_set) for c in incidentEnergyParserList]
+    )
+    missing_err = np.all([a is None for a in Einc_lab_err[2:]])
+    if not missing_err:
+        if Einc_lab_err[1] != Einc_units:
+            raise ValueError(
+                f"Inconsistent units for Einc and Einc error: {Einc_units} and {Einc_lab_err[1]}"
+            )
+    Einc_lab_err = np.array(
+        Einc_lab_err[2:],
+        dtype=np.float64,
+    )
+
+    return Einc_lab, Einc_lab_err, Einc_units
 
 
 def parse_angular_distribution(
+    subentry,
     data_set,
     data_error_columns=None,
     err_treatment="independent",
+    vocal=False,
 ):
     r"""
     Extracts angular differential cross sections, returning incident and product excitation
     energy in MeV, angles and error in angle in degrees, and differential cross section and its
-    error in mb/Sr.
+    error in mb/Sr all in a numpy array.
     """
+    if vocal:
+        print(
+            f"Found subentry {subentry} with the following columns:\n{data_set.labels}"
+        )
 
     if data_error_columns is None:
         data_error_columns = [b + "-ERR" for b in baseDataKeys] + dataTotalErrorKeys
 
-    # parse angle
-    angle, angle_err = parse_angle(data_set)
+    try:
+        # parse angle
+        angle, angle_err, angle_units = parse_angle(data_set)
 
-    # parse energy if it's present
-    E_inc_cm, E_inc_cm_err = parse_inc_energy(data_set)
+        # parse energy if it's present
+        Einc_lab, Einc_lab_err, Einc_units = parse_inc_energy(data_set)
 
-    # parse excitation energy if it's present
-    E_ex, E_ex_err = parse_ex_energy(data_set)
+        # parse excitation energy if it's present
+        Ex, Ex_err, Ex_units = parse_ex_energy(data_set)
 
-    # parse diff xs
-    xs, xs_err = parse_differential_data(
-        data_set, data_error_columns=data_error_columns, err_treatment=err_treatment
-    )
+        # parse diff xs
+        xs, xs_err, xs_units = parse_differential_data(
+            data_set, data_error_columns=data_error_columns, err_treatment=err_treatment
+        )
+    except Exception as e:
+        new_exception = type(e)(f"Error while parsing {subentry}")
+        raise new_exception from e
 
-    return E_inc_cm, E_inc_cm_err, E_ex, E_ex_err, angle, angle_err, xs, xs_err
+    N = data_set.numrows()
+    data = np.zeros((8, N))
+
+    data[:, :] = [
+        Einc_lab,
+        np.nan_to_num(Einc_lab_err),
+        np.nan_to_num(Ex),
+        np.nan_to_num(Ex_err),
+        angle,
+        np.nan_to_num(angle_err),
+        xs,
+        np.nan_to_num(xs_err),
+    ]
+
+    return data, (angle_units, Einc_units, Ex_units, xs_units)
 
 
 def get_measurements_from_subentry(
@@ -373,67 +489,76 @@ def get_measurements_from_subentry(
     Ex_range=(0, np.inf),
     elastic_only=False,
     suppress_numbered_errs=True,
+    vocal=False,
 ):
     r"""unrolls subentry into individual arrays for each energy"""
 
-    err_labels = [label for label in data_set.labels if "ERR" in label]
-    if "ANG-ERR" in err_labels:
-        err_labels.remove("ANG-ERR")
+    Einc = parse_inc_energy(data_set)[0]
+    Ex = np.nan_to_num(parse_ex_energy(data_set)[0])
+    if not np.any(
+        np.logical_and(
+            np.logical_and(Einc >= Einc_range[0], Einc <= Einc_range[1]),
+            np.logical_and(Ex >= Ex_range[0], Ex <= Ex_range[1]),
+        )
+    ):
+        return []
 
-    print(f"Error labels for {subentry}: ")
-    print(err_labels)
+    lbl_frags_to_skip = ["ANG", "EN", "E-LVL", "E-EXC"]
+    err_labels = [
+        label
+        for label in data_set.labels
+        if "ERR" in label and np.all([frag not in label for frag in lbl_frags_to_skip])
+    ]
 
     if suppress_numbered_errs:
-        err_labels = [
-            l for l in err_labels if not (l[-1].isdigit() and l[:-1] == "ERR-")
-        ]
+        err_labels = [l for l in err_labels if not (l[-1].isdigit())]
 
     err_labels_set = set(err_labels)
     standard_labels = set(["DATA-ERR", "ERR-T"])
     asymmetric_labels = set(["-DATA-ERR", "+DATA-ERR"])
+    systematic_and_statistical_labels = set(["ERR-S", "ERR-SYS"])
+    data_and_systematic_labels = set(["DATA-ERR", "ERR-SYS"])
 
-    if err_labels == ["DATA-ERR"]:
+    if err_labels == []:
+        err_treatment = "independent"
+    elif err_labels == ["DATA-ERR"]:
+        err_treatment = "independent"
+    elif err_labels == ["ERR-DIG"]:
         err_treatment = "independent"
     elif err_labels == ["ERR-T"]:
         err_treatment = "independent"
-    elif err_labels_set.union(standard_labels) == err_labels_set.intersection(
-        standard_labels
-    ):
-        err_treatment = "cumulative"
+    elif err_labels == ["ERR-S"]:
+        err_treatment = "independent"
+    elif err_labels_set == systematic_and_statistical_labels:
+        err_treatment = "independent"
+    elif err_labels_set == data_and_systematic_labels:
+        err_treatment = "independent"
+    elif err_labels_set == standard_labels:
+        err_treatment = "independent"
     elif err_labels_set.union(asymmetric_labels) == err_labels_set.intersection(
         asymmetric_labels
     ):
         err_treatment = "cumulative"
     else:
         raise NotImplementedError(
-            "Ambiguous set of error labels:\n" + [f"{l}\n" for l in err_labels].join()
+            f"Subentry {subentry} has an ambiguous set of error labels:\n"
+            + "".join([f"{l}\n" for l in err_labels])
         )
 
-    E_inc_cm, E_inc_cm_err, E_ex, E_ex_err, angle, angle_err, xs, xs_err = (
-        parse_angular_distribution(
-            data_set, data_error_columns=err_labels, err_treatment=err_treatment
-        )
+    data, (angle_units, Einc_units, Ex_units, xs_units) = parse_angular_distribution(
+        subentry,
+        data_set,
+        data_error_columns=err_labels,
+        err_treatment=err_treatment,
+        vocal=vocal,
     )
 
-    N = data_set.numrows()
-    data = np.zeros((6, N))
-
-    data[:, :] = [
-        E_inc_cm,
-        np.nan_to_num(E_inc_cm_err),
-        np.nan_to_num(E_ex),
-        np.nan_to_num(E_ex_err),
-        angle,
-        np.nan_to_num(angle_err),
-        xs,
-        np.nan_to_num(xs_err),
-    ]
-
-    Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] < Einc_range[1])
+    Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] <= Einc_range[1])
     data = data[:, Einc_mask]
 
-    Ex_mask = np.logical_and(data[2, :] >= Ex_range[0], data[2, :] < Ex_range[1])
-    data = data[:, Ex_mask]
+    if not elastic_only:
+        Ex_mask = np.logical_and(data[2, :] >= Ex_range[0], data[2, :] <= Ex_range[1])
+        data = data[:, Ex_mask]
 
     # AngularDistribution objects sorted by incident energy, then excitation energy
     # or just incident enrgy if elastic_only is True
@@ -449,11 +574,20 @@ def get_measurements_from_subentry(
 
         if elastic_only:
             measurements.append(
-                (Einc, Einc_err),
-                AngularDistribution(subentry, data[4:, mask], Einc, Einc_err, 0, 0),
+                AngularDistribution(
+                    subentry,
+                    data[4:, mask],
+                    Einc,
+                    Einc_err,
+                    Einc_units,
+                    0,
+                    0,
+                    Ex_units,
+                    angle_units,
+                    xs_units,
+                )
             )
         else:
-            measurements.append((Einc, Einc_err), [])
             subset = data[2:, mask]
 
             # find set of unique residual excitation energies
@@ -463,30 +597,61 @@ def get_measurements_from_subentry(
             for Ex in np.sort(unique_Ex):
                 mask = np.isclose(subset[0, :], Ex)
                 Ex_err = subset[1, mask][0]
-                measurement = AngularDistribution(
-                    subentry, subset[2:, mask], Einc, Einc_err, Ex, Ex_err
+                measurements.append(
+                    AngularDistribution(
+                        subentry,
+                        subset[2:, mask],
+                        Einc,
+                        Einc_err,
+                        Einc_units,
+                        Ex,
+                        Ex_err,
+                        Ex_units,
+                        angle_units,
+                        xs_units,
+                    )
                 )
-                measurements[-1][1].append(((Ex, Ex_err), measurement))
 
     return measurements
 
 
 class AngularDistribution:
+    r"""for a given incident and residual excitation energy stores angular distribution with x and y errors. x is angle in degrees. data is [x, x_err, y, y_err]. All energies in MeV."""
+
     def __init__(
         self,
         subentry: str,
         data: np.array,
         Einc: float,
         Einc_err: float,
+        Einc_units: str,
         Ex: float,
         Ex_err: float,
+        Ex_units: str,
+        x_units: str,
+        y_units: str,
     ):
         self.subentry = subentry
-        self.data = data
+        self.data = data[:, data[0, :].argsort()]
         self.Einc = Einc
         self.Einc_err = Einc_err
+        self.Einc_units = Einc_units
         self.Ex = Ex
         self.Ex_err = Ex_err
+        self.Ex_units = Ex_units
+        self.x_units = x_units
+        self.y_units = y_units
+
+        self.x = self.data[0, :]
+        self.y = self.data[2, :]
+        self.x_err = self.data[1, :]
+        self.y_err = self.data[3, :]
+
+        assert (
+            np.all(self.x[1:] - self.x[:-1] >= 0)
+            and self.x[0] >= 0
+            and self.x[-1] <= 180
+        )
 
 
 def get_symbol(A, Z, Ex=None):
@@ -501,12 +666,67 @@ def get_symbol(A, Z, Ex=None):
     elif (A, Z) == (4, 2):
         return r"$\alpha$"
     else:
-        ex = f"({float(Ex):1.3f})"
-        return f"$^{{{A}}}${str(periodictable.elements[Z])}{ex}"
+        if Ex is None:
+            return f"$^{{{A}}}${str(periodictable.elements[Z])}"
+        else:
+            ex = f"({float(Ex):1.3f})"
+            return f"$^{{{A}}}${str(periodictable.elements[Z])}{ex}"
+
+
+def filter_out_lab_angle(data_set):
+    angle_labels = [
+        l
+        for l in data_set.labels
+        if (
+            "ANG" in l
+            and "-NRM" not in l
+            and np.all(
+                [
+                    f not in l
+                    for f in errorSuffix + resolutionFWSuffix + resolutionHWSuffix
+                ]
+            )
+        )
+    ]
+    if len(angle_labels) > 1:
+        raise ValueError(f"Too many angle columns: {angle_labels}")
+    elif len(angle_labels) == 0:
+        return False
+    else:
+        return "-CM" in angle_labels[0]
 
 
 class ExforEntryAngularDistribution:
     r"""2-body reaction"""
+
+    def plot(
+        self,
+        ax,
+        offsets=None,
+        log=True,
+        draw_baseline=False,
+        baseline_offset=None,
+        xlim=[0, 180],
+        fontsize=10,
+        label_kwargs={
+            "label_offset_factor": 2,
+            "label_energy_err": False,
+            "label_offset": True,
+        },
+    ):
+        plot_angular_distributions(
+            self.measurements,
+            ax,
+            offsets,
+            self.data_symbol,
+            self.rxn,
+            log,
+            draw_baseline,
+            baseline_offset,
+            xlim,
+            fontsize,
+            label_kwargs,
+        )
 
     def __init__(
         self,
@@ -519,19 +739,44 @@ class ExforEntryAngularDistribution:
         special_rxn_type="",
         Einc_range: tuple = None,
         Ex_range: tuple = None,
-        elastic_only=False,
         suppress_numbered_errs=True,
+        mass_args={},
+        vocal=False,
+        filter_subentries=lambda subentry: True,
     ):
+        r""" """
+        self.vocal = vocal
         self.entry = entry
         entry_datasets = __EXFOR_DB__.retrieve(ENTRY=entry)[entry].getDataSets()
 
+        if product is None:
+            product = projectile
+        if residual is None:
+            residual = target
+
         self.target = target
         self.projectile = projectile
+        self.product = product
+        self.residual = residual
 
-        if product is None:
-            self.product = projectile
-        if residual is None:
-            self.residual = target
+        if Einc_range is None:
+            Einc_range = (0, np.inf)
+        self.Einc_range = Einc_range
+
+        elastic_only = False
+        product_match_key = self.product
+        if (
+            Ex_range is None
+            and self.product == self.projectile
+            and self.residual == self.target
+        ):
+            Ex_range = (0, 0)
+            elastic_only = True
+            product_match_key = "EL"
+        elif Ex_range is None:
+            Ex_range = (0, np.inf)
+
+        self.Ex_range = Ex_range
 
         if len(self.residual) == 3:
             self.Ex_prime = self.residual[2]
@@ -542,6 +787,18 @@ class ExforEntryAngularDistribution:
         Apost = self.residual[0] + self.product[0]
         Zpre = self.target[1] + self.projectile[1]
         Zpost = self.residual[1] + self.product[1]
+
+        # TODO handle uncertainties cleanly
+        self.mass_target = mass.mass(*self.target, **mass_args)[0]
+        self.mass_projectile = mass.mass(*self.projectile, **mass_args)[0]
+        self.mass_residual = mass.mass(*self.residual, **mass_args)[0]
+        self.mass_product = mass.mass(*self.product, **mass_args)[0]
+        self.Q = (
+            self.mass_projectile
+            + self.mass_target
+            - self.mass_residual
+            - self.mass_product
+        )
 
         if Apre != Apost and Zpre != Zpost:
             raise ValueError("Isospin not conserved in this reaction")
@@ -560,79 +817,189 @@ class ExforEntryAngularDistribution:
         self.exfor_quantities = quantity_matches[quantity]
         self.data_symbol = quantity_symbols[tuple(self.exfor_quantities[0])]
 
-        if Einc_range is None:
-            Einc_range = (0, np.inf)
-        self.Einc_range = Einc_range
-        if Ex_range is None:
-            Ex_range = (0, np.inf)
-        self.Ex_range = Ex_range
-
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
 
         for key, data_set in entry_datasets.items():
 
-            if isinstance(data_set.reaction[0], X4Reaction):
-                # TODO need to do like EL for product for elastic or something stupid like that?
-                isotope = (
-                    data_set.reaction[0].targ.getA(),
-                    data_set.reaction[0].targ.getZ(),
-                )
-                projectile = (
-                    data_set.reaction[0].proj.getA(),
-                    data_set.reaction[0].proj.getZ(),
-                )
+            if not isinstance(data_set.reaction[0], X4Reaction):
+                continue
+
+            target = (
+                data_set.reaction[0].targ.getA(),
+                data_set.reaction[0].targ.getZ(),
+            )
+            projectile = (
+                data_set.reaction[0].proj.getA(),
+                data_set.reaction[0].proj.getZ(),
+            )
+            if elastic_only:
+                product = data_set.reaction[0].products[0]
+            else:
                 product = (
                     data_set.reaction[0].products[0].getA(),
                     data_set.reaction[0].products[0].getZ(),
                 )
+            if data_set.reaction[0].residual is None:
+                continue
+            else:
                 residual = (
                     data_set.reaction[0].residual.getA(),
                     data_set.reaction[0].residual.getZ(),
                 )
-                quantity = data_set.reaction[0].quantity
-                if quantity[-1] == "EXP":
-                    quantity = quantity[:-1]
-                if (
-                    isotope == self.isotope
-                    and projectile == self.projectile
-                    and product == self.product
-                    and residual == self.residual
-                ):
-                    # matched reaction
-                    if quantity in self.exfor_quantities:
-                        # matched reaction and quantity
-                        # should be the same for every subentry
-                        self.meta = {
-                            "author": data_set.author,
-                            "title": data_set.title,
-                            "year": data_set.year,
-                            "institute": data_set.institute,
-                        }
-                        self.measurements = get_measurements_from_subentry(
-                            key[1],
-                            data_set,
-                            self.Einc_range,
-                            self.Ex_range,
-                            elastic_only,
-                            suppress_numbered_errs,
-                        )
+
+            quantity = data_set.reaction[0].quantity
+            if not (
+                target == self.target
+                and projectile == self.projectile
+                and product == product_match_key
+                and residual == self.residual
+            ):
+                continue
+
+            if quantity[-1] == "EXP":
+                quantity = quantity[:-1]
+
+            # matched reaction
+            if quantity not in self.exfor_quantities:
+                continue
+
+            if not filter_subentries(data_set):
+                continue
+
+            # should be the same for every subentry
+            self.meta = {
+                "author": data_set.author,
+                "title": data_set.title,
+                "year": data_set.year,
+                "institute": data_set.institute,
+            }
+            measurements = get_measurements_from_subentry(
+                key[1],
+                data_set,
+                self.Einc_range,
+                self.Ex_range,
+                elastic_only,
+                suppress_numbered_errs,
+                vocal=self.vocal,
+            )
+            for m in measurements:
+                self.measurements.append(m)
+
+
+def set_label(
+    ax,
+    measurements: list,
+    colors: list,
+    offset,
+    x,
+    y,
+    log,
+    fontsize=10,
+    label_xloc_deg=None,
+    label_offset_factor=2,
+    label_energy_err=False,
+    label_offset=True,
+    label_incident_energy=True,
+    label_excitation_energy=False,
+    label_exfor=False,
+):
+
+    # TODO when there is more than one measurement, make each subentry label correspond to its
+    # corresponding color: https://matplotlib.org/1.5.0/examples/text_labels_and_annotations/rainbow_text.html
+    yc = y
+    if label_xloc_deg is None:
+        if x[0] > 20 and x[-1] > 150:
+            label_xloc_deg = -18
+            # yc = y[ x < (x.min() + x.max()) / 2  ]
+        if x[0] > 30 and x[-1] > 150:
+            label_xloc_deg = 1
+            # yc = y[ x < (x.min() + x.max()) / 2  ]
+        elif x[-1] < 140:
+            label_xloc_deg = 145
+            yc = y[x > (x.min() + x.max()) / 2]
+        else:
+            label_xloc_deg = 175
+            yc = y[x > (x.min() + x.max()) / 2]
+
+    label_yloc = np.mean(yc)
+
+    if log:
+        label_yloc *= label_offset_factor
+    else:
+        label_yloc += label_offset_factor
+
+    label_location = (label_xloc_deg, label_yloc)
+
+    if log:
+        offset_text = f"($\\times$ {offset:0.0e})"
+    else:
+        offset_text = f"($+$ {offset:1.0f})"
+
+    m = measurements[0]
+    label = ""
+    if label_incident_energy:
+        label += f"\n{m.Einc:1.2f}"
+        if label_energy_err:
+            label += f" $\pm$ {m.Einc_err:1.2f}"
+        label += f" {m.Einc_units}"
+    if label_excitation_energy:
+        label += f"\n$E_{{x}} = ${m.Ex:1.2f}"
+        if label_energy_err:
+            label += f" $\pm$ {m.Ex_err:1.2f}"
+        label += f" {m.Ex_units}"
+    if label_exfor:
+        label += "\n"
+        for i, m in enumerate(measurements):
+            if i == len(measurements) - 1:
+                label += f"{m.subentry}, "
+            else:
+                label += f"{m.subentry}"
+    if label_offset:
+        label += "\n" + offset_text
+
+    t = ax.text(*label_location, label, fontsize=fontsize, color=colors[-1])
+
+
+def plot_errorbar(ax, x, x_err, y, y_err, offset, log):
+    if log:
+        y *= offset
+        y_err *= offset
+    else:
+        y += offset
+
+    p = ax.errorbar(
+        x,
+        y,
+        yerr=y_err,
+        xerr=x_err,
+        marker="s",
+        markersize=2,
+        alpha=0.75,
+        linestyle="none",
+        elinewidth=3,
+        # capthick=2,
+        # capsize=1,
+    )
+    return p.lines[0].get_color()
 
 
 def plot_angular_distributions(
-    ax,
     measurements,
+    ax,
     offsets=None,
     data_symbol="",
     rxn_label="",
-    label_xloc_deg=None,
-    label_offset_factor=2,
     log=True,
-    add_baseline=False,
+    draw_baseline=False,
+    baseline_offset=None,
     xlim=[0, 180],
-    label_energy_err=True,
-    label_offset=True,
     fontsize=10,
+    label_kwargs={
+        "label_offset_factor": 2,
+        "label_energy_err": False,
+        "label_offset": True,
+    },
 ):
     r"""
     Given measurements, a list where each entry is a tuple of ((E, E_err), AngularDistribution)
@@ -649,72 +1016,49 @@ def plot_angular_distributions(
         else:
             offsets = constant_factor * np.arange(0, len(measurements))
 
-    units_x = "deg"
-    units_y = "mb/Sr"
-
     # plot each measurement and add a label
-    for offset, ((E, E_err), m) in zip(offsets, measurements):
+    for offset, m in zip(offsets, measurements):
 
-        x = np.copy(m.data[0, :])
-        dx = np.copy(m.data[1, :])
-        y = np.copy(m.data[2, :])
-        dy = np.copy(m.data[3, :])
-        if log:
-            y *= offset
-            dy *= offset
-        else:
-            y += offset
+        if not isinstance(m, list):
+            m = [m]
 
-        p = ax.errorbar(
-            x,
-            y,
-            yerr=dy,
-            xerr=dx,
-            marker="s",
-            markersize=2,
-            alpha=0.6,
-            linestyle="none",
-            linewidth=4,
-        )
+        c = []
+        for measurement in m:
+            x = np.copy(measurement.x)
+            x_err = np.copy(measurement.x_err)
+            y = np.copy(measurement.y)
+            y_err = np.copy(measurement.y_err)
+            color = plot_errorbar(ax, x, x_err, y, y_err, offset, log)
+            c.append(color)
 
-        if add_baseline:
-            ax.plot([0, 180], [offset, offset], "k--", alpha=0.5)
-
-        if label_xloc_deg is not None:
-            if x[0] > 15 and x[-1] > 170:
-                label_xloc_deg = -18
-            elif x[-1] < 140:
-                label_xloc_deg = 150
+        if draw_baseline:
+            if log:
+                baseline_offset = baseline_offset if baseline_offset is not None else 1
+                baseline_height = offset * baseline_offset
             else:
-                label_xloc_deg = -18
+                baseline_offset = baseline_offset if baseline_offset is not None else 0
+                baseline_height = offset + baseline_offset
+            ax.plot([0, 180], [baseline_height, baseline_height], "k--", alpha=0.25)
 
-        label_yloc_deg = np.mean(y)
-        if log:
-            label_yloc_deg *= label_offset_factor
-        else:
-            label_yloc_deg += label_offset_factor
+        set_label(ax, m, c, offset, x, y, log, fontsize, **label_kwargs)
 
-        label_location = (label_xloc_deg, label_yloc_deg)
+    if isinstance(measurements[0], list):
+        x_units = measurements[0][0].x_units
+        y_units = measurements[0][0].y_units
+    else:
+        x_units = measurements[0].x_units
+        y_units = measurements[0].y_units
 
-        if log:
-            offset_text = f"\n($\\times$ {offset:0.0e})"
-        else:
-            offset_text = f"\n($+$ {offset:1.0f})"
-        label = f"{E}"
-        if label_energy_err:
-            label += f" $\pm$ {E_err}"
-        label += " MeV"
-        if label_offset:
-            label += offset_text
-
-        ax.text(*label_location, label, fontsize=fontsize, color=p.lines[0].get_color())
-
-    ax.set_xlabel(r"$\theta$ [{}]".format(units_x))
-    ax.set_ylabel(r"{} [{}]".format(data_symbol, units_y))
+    ax.set_xlabel(r"$\theta$ [{}]".format(x_units))
+    ax.set_ylabel(r"{} [{}]".format(data_symbol, y_units))
+    ax.set_xticks(np.arange(0, 180.01, 30))
     if log:
         ax.set_yscale("log")
     if xlim is not None:
         ax.set_xlim(xlim)
     ax.set_title(f"{rxn_label}")
+
+    if log:
+        ax.set_yscale("log")
 
     return offsets
