@@ -505,6 +505,8 @@ def get_measurements_from_subentry(
     Einc_range=(0, np.inf),
     Ex_range=(0, np.inf),
     elastic_only=False,
+    err_labels=None,
+    err_treatment=None,
     vocal=False,
 ):
     r"""unrolls subentry into individual arrays for each energy"""
@@ -519,46 +521,50 @@ def get_measurements_from_subentry(
     ):
         return []
 
-    lbl_frags_to_skip = ["ANG", "EN", "E-LVL", "E-EXC"]
-    err_labels = [
-        label
-        for label in data_set.labels
-        if "ERR" in label and np.all([frag not in label for frag in lbl_frags_to_skip])
-    ]
+    if err_labels is None:
+        lbl_frags_to_skip = ["ANG", "EN", "E-LVL", "E-EXC"]
+        err_labels = [
+            label
+            for label in data_set.labels
+            if "ERR" in label
+            and np.all([frag not in label for frag in lbl_frags_to_skip])
+        ]
 
-    err_labels_set = set(err_labels)
-    asymmetric_labels = set(["-DATA-ERR", "+DATA-ERR"])
-    systematic_and_statistical_labels = set(["ERR-S", "ERR-SYS"])
-    data_and_systematic_labels = set(["DATA-ERR", "ERR-SYS"])
+        err_labels_set = set(err_labels)
+        asymmetric_labels = set(["-DATA-ERR", "+DATA-ERR"])
+        systematic_and_statistical_labels = set(["ERR-S", "ERR-SYS"])
+        data_and_systematic_labels = set(["DATA-ERR", "ERR-SYS"])
 
-    if err_labels == []:
-        err_treatment = "independent"
-    elif err_labels == ["DATA-ERR"]:
-        err_treatment = "independent"
-    elif err_labels == ["ERR-DIG"]:
-        err_treatment = "independent"
-    elif err_labels == ["ERR-T"]:
-        err_treatment = "independent"
-    elif err_labels == ["ERR-S"]:
-        err_treatment = "independent"
-    elif err_labels_set == systematic_and_statistical_labels:
-        err_treatment = "independent"
-    elif err_labels_set == data_and_systematic_labels:
-        err_treatment = "independent"
-    elif err_labels_set.union(asymmetric_labels) == err_labels_set.intersection(
-        asymmetric_labels
-    ):
-        print(
-            f"Warning: converting asymmetric errors to symmetric in subentry {subentry}"
-        )
-        err_treatment = "cumulative"
+        if err_labels == []:
+            err_treatment = "independent"
+        elif err_labels == ["DATA-ERR"]:
+            err_treatment = "independent"
+        elif err_labels == ["ERR-DIG"]:
+            err_treatment = "independent"
+        elif err_labels == ["ERR-T"]:
+            err_treatment = "independent"
+        elif err_labels == ["ERR-S"]:
+            err_treatment = "independent"
+        elif err_labels_set == systematic_and_statistical_labels:
+            err_treatment = "independent"
+        elif err_labels_set == data_and_systematic_labels:
+            err_treatment = "independent"
+        elif err_labels_set.union(asymmetric_labels) == err_labels_set.intersection(
+            asymmetric_labels
+        ):
+            print(
+                f"Warning: converting asymmetric errors to symmetric in subentry {subentry}"
+            )
+            err_treatment = "cumulative"
+        else:
+            raise NotImplementedError(
+                f"Subentry {subentry} has an ambiguous set of error labels:\n"
+                + "".join([f"{l}\n" for l in err_labels])
+            )
     else:
-        raise NotImplementedError(
-            f"Subentry {subentry} has an ambiguous set of error labels:\n"
-            + "".join([f"{l}\n" for l in err_labels])
-        )
+        assert err_treatment is not None
 
-    data, (angle_units, Einc_units, Ex_units, xs_units) = parse_angular_distribution(
+    data, units = parse_angular_distribution(
         subentry,
         data_set,
         data_error_columns=err_labels,
@@ -566,6 +572,16 @@ def get_measurements_from_subentry(
         vocal=vocal,
     )
 
+    measurements = sort_subentry_data_by_energy(
+        subentry, data, Einc_range, Ex_range, elastic_only, units
+    )
+    return measurements
+
+
+def sort_subentry_data_by_energy(
+    subentry, data, Einc_range, Ex_range, elastic_only, units
+):
+    angle_units, Einc_units, Ex_units, xs_units = units
     Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] <= Einc_range[1])
     data = data[:, Einc_mask]
 
@@ -624,7 +640,6 @@ def get_measurements_from_subentry(
                         xs_units,
                     )
                 )
-
     return measurements
 
 
