@@ -486,6 +486,7 @@ def attempt_parse_subentry(
     Einc_range=(0, np.inf),
     Ex_range=(0, np.inf),
     elastic_only=False,
+    vocal=True,
     err_labels=None,
     err_treatment=None,
 ):
@@ -497,7 +498,7 @@ def attempt_parse_subentry(
             Einc_range=Einc_range,
             Ex_range=Ex_range,
             elastic_only=elastic_only,
-            vocal=True,
+            vocal=vocal,
             err_labels=err_labels,
             err_treatment=err_treatment,
         )
@@ -561,9 +562,10 @@ def get_measurements_from_subentry(
         elif err_labels_set.union(asymmetric_labels) == err_labels_set.intersection(
             asymmetric_labels
         ):
-            print(
-                f"Warning: converting asymmetric errors to symmetric in subentry {subentry}"
-            )
+            if vocal:
+                print(
+                    f"Warning: converting asymmetric errors to symmetric in subentry {subentry}"
+                )
             err_treatment = "cumulative"
         else:
             raise NotImplementedError(
