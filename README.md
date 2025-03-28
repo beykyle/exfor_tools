@@ -17,10 +17,9 @@ Package hosted at [pypi.org/project/exfor-tools/](https://pypi.org/project/exfor
 
 ## examples and tutorials
 
-Check out [examples/]()
+Check out [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/data_curation_tutorial.ipynb)
 
-
-The tutorial provided shows how to query for and parse exfor entries, and curate and plot a data set, producing this figure: 
+This demonstrates how to query for and parse exfor entries, and curate and plot a data set, producing this figure: 
 
 ![](https://github.com/beykyle/exfor_tools/blob/main/assets/lead_208_pp_dxds.png)
 
