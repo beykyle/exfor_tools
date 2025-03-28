@@ -989,9 +989,9 @@ def set_label(
     label_location = (label_xloc_deg, label_yloc)
 
     if log:
-        offset_text = f"($\\times$ {offset:0e})"
+        offset_text = f"\n($\\times$ {offset:1.0e})"
     else:
-        offset_text = f"($+$ {offset:1f})"
+        offset_text = f"\n($+$ {offset:1.0f})"
 
     m = measurements[0]
     label = ""
