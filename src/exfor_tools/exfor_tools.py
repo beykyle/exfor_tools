@@ -133,7 +133,6 @@ def get_exfor_differential_data(
     special_rxn_type="",
     Einc_range: tuple = None,
     Ex_range: tuple = None,
-    suppress_numbered_errs=True,
     mass_args={},
     vocal=False,
     filter_subentries=lambda subentry: subentry.rows > 2 and len(subentry.labels) > 2,
@@ -182,13 +181,12 @@ def get_exfor_differential_data(
                 special_rxn_type,
                 Einc_range,
                 Ex_range,
-                suppress_numbered_errs,
                 mass_args,
                 vocal,
                 filter_subentries,
             )
 
-        except ValueError as e:
+        except Exception as e:
             print(f"There was an error reading entry {entry}, it will be skipped:")
             print(e)
         if len(data_set.measurements) > 0 and entry not in data_sets:
@@ -482,13 +480,31 @@ def parse_angular_distribution(
     return data, (angle_units, Einc_units, Ex_units, xs_units)
 
 
+def attempt_parse_subentry(
+    subentry,
+    data_set,
+    Einc_range=(0, np.inf),
+    Ex_range=(0, np.inf),
+    elastic_only=False,
+):
+    failed_parses = []
+    try:
+        measurements = get_measurements_from_subentry(
+            subentry, data_set, Einc_range, Ex_range, elastic_only, vocal=True
+        )
+    except Exception as e:
+        print(f"Failed to parse subentry {subentry}:\n{e}")
+        failed_parses.append((subentry, data_set))
+
+    return measurements, dict(failed_parses)
+
+
 def get_measurements_from_subentry(
     subentry,
     data_set,
     Einc_range=(0, np.inf),
     Ex_range=(0, np.inf),
     elastic_only=False,
-    suppress_numbered_errs=True,
     vocal=False,
 ):
     r"""unrolls subentry into individual arrays for each energy"""
@@ -510,11 +526,7 @@ def get_measurements_from_subentry(
         if "ERR" in label and np.all([frag not in label for frag in lbl_frags_to_skip])
     ]
 
-    if suppress_numbered_errs:
-        err_labels = [l for l in err_labels if not (l[-1].isdigit())]
-
     err_labels_set = set(err_labels)
-    standard_labels = set(["DATA-ERR", "ERR-T"])
     asymmetric_labels = set(["-DATA-ERR", "+DATA-ERR"])
     systematic_and_statistical_labels = set(["ERR-S", "ERR-SYS"])
     data_and_systematic_labels = set(["DATA-ERR", "ERR-SYS"])
@@ -533,11 +545,12 @@ def get_measurements_from_subentry(
         err_treatment = "independent"
     elif err_labels_set == data_and_systematic_labels:
         err_treatment = "independent"
-    elif err_labels_set == standard_labels:
-        err_treatment = "independent"
     elif err_labels_set.union(asymmetric_labels) == err_labels_set.intersection(
         asymmetric_labels
     ):
+        print(
+            f"Warning: converting asymmetric errors to symmetric in subentry {subentry}"
+        )
         err_treatment = "cumulative"
     else:
         raise NotImplementedError(
@@ -739,7 +752,6 @@ class ExforEntryAngularDistribution:
         special_rxn_type="",
         Einc_range: tuple = None,
         Ex_range: tuple = None,
-        suppress_numbered_errs=True,
         mass_args={},
         vocal=False,
         filter_subentries=lambda subentry: True,
@@ -880,7 +892,6 @@ class ExforEntryAngularDistribution:
                 self.Einc_range,
                 self.Ex_range,
                 elastic_only,
-                suppress_numbered_errs,
                 vocal=self.vocal,
             )
             for m in measurements:
@@ -952,9 +963,9 @@ def set_label(
         label += "\n"
         for i, m in enumerate(measurements):
             if i == len(measurements) - 1:
-                label += f"{m.subentry}, "
-            else:
                 label += f"{m.subentry}"
+            else:
+                label += f"{m.subentry}, "
     if label_offset:
         label += "\n" + offset_text
 
