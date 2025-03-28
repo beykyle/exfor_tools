@@ -133,7 +133,7 @@ def get_exfor_differential_data(
     special_rxn_type="",
     Einc_range: tuple = None,
     Ex_range: tuple = None,
-    mass_args={},
+    mass_kwargs={},
     vocal=False,
     filter_subentries=lambda subentry: subentry.rows > 2 and len(subentry.labels) > 2,
 ):
@@ -181,7 +181,7 @@ def get_exfor_differential_data(
                 special_rxn_type,
                 Einc_range,
                 Ex_range,
-                mass_args,
+                mass_kwargs,
                 vocal,
                 filter_subentries,
             )
@@ -486,11 +486,20 @@ def attempt_parse_subentry(
     Einc_range=(0, np.inf),
     Ex_range=(0, np.inf),
     elastic_only=False,
+    err_labels=None,
+    err_treatment=None,
 ):
     failed_parses = []
     try:
         measurements = get_measurements_from_subentry(
-            subentry, data_set, Einc_range, Ex_range, elastic_only, vocal=True
+            subentry=subentry,
+            data_set=data_set,
+            Einc_range=Einc_range,
+            Ex_range=Ex_range,
+            elastic_only=elastic_only,
+            vocal=True,
+            err_labels=err_labels,
+            err_treatment=err_treatment,
         )
     except Exception as e:
         print(f"Failed to parse subentry {subentry}:\n{e}")
@@ -505,9 +514,9 @@ def get_measurements_from_subentry(
     Einc_range=(0, np.inf),
     Ex_range=(0, np.inf),
     elastic_only=False,
+    vocal=False,
     err_labels=None,
     err_treatment=None,
-    vocal=False,
 ):
     r"""unrolls subentry into individual arrays for each energy"""
 
@@ -727,35 +736,6 @@ def filter_out_lab_angle(data_set):
 class ExforEntryAngularDistribution:
     r"""2-body reaction"""
 
-    def plot(
-        self,
-        ax,
-        offsets=None,
-        log=True,
-        draw_baseline=False,
-        baseline_offset=None,
-        xlim=[0, 180],
-        fontsize=10,
-        label_kwargs={
-            "label_offset_factor": 2,
-            "label_energy_err": False,
-            "label_offset": True,
-        },
-    ):
-        plot_angular_distributions(
-            self.measurements,
-            ax,
-            offsets,
-            self.data_symbol,
-            self.rxn,
-            log,
-            draw_baseline,
-            baseline_offset,
-            xlim,
-            fontsize,
-            label_kwargs,
-        )
-
     def __init__(
         self,
         entry: str,
@@ -767,9 +747,10 @@ class ExforEntryAngularDistribution:
         special_rxn_type="",
         Einc_range: tuple = None,
         Ex_range: tuple = None,
-        mass_args={},
+        mass_kwargs={},
+        parsing_kwargs={},
         vocal=False,
-        filter_subentries=lambda subentry: True,
+        filter_subentries=filter_out_lab_angle,
     ):
         r""" """
         self.vocal = vocal
@@ -816,10 +797,10 @@ class ExforEntryAngularDistribution:
         Zpost = self.residual[1] + self.product[1]
 
         # TODO handle uncertainties cleanly
-        self.mass_target = mass.mass(*self.target, **mass_args)[0]
-        self.mass_projectile = mass.mass(*self.projectile, **mass_args)[0]
-        self.mass_residual = mass.mass(*self.residual, **mass_args)[0]
-        self.mass_product = mass.mass(*self.product, **mass_args)[0]
+        self.mass_target = mass.mass(*self.target, **mass_kwargs)[0]
+        self.mass_projectile = mass.mass(*self.projectile, **mass_kwargs)[0]
+        self.mass_residual = mass.mass(*self.residual, **mass_kwargs)[0]
+        self.mass_product = mass.mass(*self.product, **mass_kwargs)[0]
         self.Q = (
             self.mass_projectile
             + self.mass_target
@@ -846,6 +827,7 @@ class ExforEntryAngularDistribution:
 
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
+        self.failed_parses = []
 
         for key, data_set in entry_datasets.items():
 
@@ -901,16 +883,48 @@ class ExforEntryAngularDistribution:
                 "year": data_set.year,
                 "institute": data_set.institute,
             }
-            measurements = get_measurements_from_subentry(
+            measurements, failed_parses = attempt_parse_subentry(
                 key[1],
                 data_set,
                 self.Einc_range,
                 self.Ex_range,
                 elastic_only,
                 vocal=self.vocal,
+                **parsing_kwargs,
             )
             for m in measurements:
                 self.measurements.append(m)
+            for subentry, data_set in failed_parses.items():
+                self.failed_parses[subentry] = data_set
+
+    def plot(
+        self,
+        ax,
+        offsets=None,
+        log=True,
+        draw_baseline=False,
+        baseline_offset=None,
+        xlim=[0, 180],
+        fontsize=10,
+        label_kwargs={
+            "label_offset_factor": 2,
+            "label_energy_err": False,
+            "label_offset": True,
+        },
+    ):
+        plot_angular_distributions(
+            self.measurements,
+            ax,
+            offsets,
+            self.data_symbol,
+            self.rxn,
+            log,
+            draw_baseline,
+            baseline_offset,
+            xlim,
+            fontsize,
+            label_kwargs,
+        )
 
 
 def set_label(
