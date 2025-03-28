@@ -124,7 +124,7 @@ def sanitize_column(col):
     return col
 
 
-def get_exfor_differential_data(
+def query_for_entries(
     target: tuple,
     projectile: tuple,
     quantity: str,
@@ -133,17 +133,14 @@ def get_exfor_differential_data(
     special_rxn_type="",
     Einc_range: tuple = None,
     Ex_range: tuple = None,
-    mass_kwargs={},
     vocal=False,
-    filter_subentries=lambda subentry: subentry.rows > 2 and len(subentry.labels) > 2,
+    filter_subentries=lambda subentry: len(subentry.labels) >= 2,
+    mass_kwargs={},
+    parsing_kwargs={},
 ):
     r"""query EXFOR for all entries satisfying search criteria, and return them
     as a dictionary of entry number to ExforEntryAngularDistribution"""
 
-    ## TODO print out all subentries and their column labels first, flagging any which have weird errors
-    ## return list of flagged entries
-    ## construct an entry object for each flagged entry one by one, using custom error handling
-    ## allow to pass in an error handling lambda into ctor
     A, Z = target
     target_symbol = f"{str(periodictable.elements[Z])}-{A}"
 
@@ -168,31 +165,36 @@ def get_exfor_differential_data(
         projectile=projectile_symbol,
     ).keys()
 
-    data_sets = {}
+    successfully_parsed_entries = {}
+    failed_entries = {}
     for entry in entries:
         try:
-            data_set = ExforEntryAngularDistribution(
-                entry,
-                target,
-                projectile,
-                quantity,
-                residual,
-                product,
-                special_rxn_type,
-                Einc_range,
-                Ex_range,
-                mass_kwargs,
-                vocal,
-                filter_subentries,
+            parsed_entry = ExforEntryAngularDistribution(
+                entry=entry,
+                target=target,
+                projectile=projectile,
+                quantity=quantity,
+                residual=residual,
+                product=product,
+                special_rxn_type=special_rxn_type,
+                Einc_range=Einc_range,
+                Ex_range=Ex_range,
+                mass_kwargs=mass_kwargs,
+                parsing_kwargs=parsing_kwargs,
+                vocal=vocal,
+                filter_subentries=filter_subentries,
             )
 
         except Exception as e:
             print(f"There was an error reading entry {entry}, it will be skipped:")
             print(e)
-        if len(data_set.measurements) > 0 and entry not in data_sets:
-            data_sets[entry] = data_set
+        if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
+            assert entry not in successfully_parsed_entries
+            successfully_parsed_entries[entry] = parsed_entry
+        elif len(parsed_entry.failed_parses) > 0:
+            failed_entries[entry] = parsed_entry
 
-    return data_sets
+    return successfully_parsed_entries, failed_entries
 
 
 def find_unique_elements_with_tolerance(arr, tolerance):
@@ -460,7 +462,7 @@ def parse_angular_distribution(
             data_set, data_error_columns=data_error_columns, err_treatment=err_treatment
         )
     except Exception as e:
-        new_exception = type(e)(f"Error while parsing {subentry}")
+        new_exception = type(e)(f"Error while parsing {subentry}: {e}")
         raise new_exception from e
 
     N = data_set.numrows()
@@ -490,7 +492,8 @@ def attempt_parse_subentry(
     err_labels=None,
     err_treatment=None,
 ):
-    failed_parses = []
+    failed_parses = {}
+    measurements = []
     try:
         measurements = get_measurements_from_subentry(
             subentry=subentry,
@@ -504,7 +507,7 @@ def attempt_parse_subentry(
         )
     except Exception as e:
         print(f"Failed to parse subentry {subentry}:\n{e}")
-        failed_parses.append((subentry, data_set))
+        failed_parses[subentry] = e
 
     return measurements, dict(failed_parses)
 
@@ -521,6 +524,7 @@ def get_measurements_from_subentry(
 ):
     r"""unrolls subentry into individual arrays for each energy"""
 
+    # TODO allow for custom added error columns
     Einc = parse_inc_energy(data_set)[0]
     Ex = np.nan_to_num(parse_ex_energy(data_set)[0])
     if not np.any(
@@ -749,10 +753,10 @@ class ExforEntryAngularDistribution:
         special_rxn_type="",
         Einc_range: tuple = None,
         Ex_range: tuple = None,
-        mass_kwargs={},
-        parsing_kwargs={},
         vocal=False,
         filter_subentries=filter_out_lab_angle,
+        mass_kwargs={},
+        parsing_kwargs={},
     ):
         r""" """
         self.vocal = vocal
@@ -829,7 +833,7 @@ class ExforEntryAngularDistribution:
 
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
-        self.failed_parses = []
+        self.failed_parses = {}
 
         for key, data_set in entry_datasets.items():
 
@@ -886,18 +890,18 @@ class ExforEntryAngularDistribution:
                 "institute": data_set.institute,
             }
             measurements, failed_parses = attempt_parse_subentry(
-                key[1],
-                data_set,
-                self.Einc_range,
-                self.Ex_range,
-                elastic_only,
-                vocal=self.vocal,
+                subentry=key[1],
+                data_set=data_set,
+                Einc_range=self.Einc_range,
+                Ex_range=self.Ex_range,
+                elastic_only=elastic_only,
+                vocal=vocal,
                 **parsing_kwargs,
             )
             for m in measurements:
                 self.measurements.append(m)
-            for subentry, data_set in failed_parses.items():
-                self.failed_parses[subentry] = data_set
+            for subentry, e in failed_parses.items():
+                self.failed_parses[key[0]] = (subentry, e)
 
     def plot(
         self,
@@ -1082,7 +1086,8 @@ def plot_angular_distributions(
                 baseline_height = offset + baseline_offset
             ax.plot([0, 180], [baseline_height, baseline_height], "k--", alpha=0.25)
 
-        set_label(ax, m, c, offset, x, y, log, fontsize, **label_kwargs)
+        if label_kwargs is not None:
+            set_label(ax, m, c, offset, x, y, log, fontsize, **label_kwargs)
 
     if isinstance(measurements[0], list):
         x_units = measurements[0][0].x_units

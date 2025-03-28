@@ -1,5 +1,5 @@
 from .exfor_tools import (
-    get_exfor_differential_data,
+    query_for_entries,
     categorize_measurements_by_energy,
     categorize_measurement_list,
     get_measurements_from_subentry,
