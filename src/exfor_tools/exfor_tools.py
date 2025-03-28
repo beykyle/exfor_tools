@@ -30,12 +30,25 @@ __EXFOR_DB__ = None
 
 
 def init_exfor_db():
+    """
+    Initialize the EXFOR database.
+
+    This function sets up the global EXFOR database manager if it has not been initialized yet.
+    """
     global __EXFOR_DB__
     if __EXFOR_DB__ is None:
         __EXFOR_DB__ = exfor_manager.X4DBManagerDefault()
 
 
 def get_db():
+    """
+    Retrieve the EXFOR database manager.
+
+    This function returns the global EXFOR database manager, initializing it if necessary.
+
+    Returns:
+        The global EXFOR database manager instance.
+    """
     global __EXFOR_DB__
     if __EXFOR_DB__ is None:
         init_exfor_db()
