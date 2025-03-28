@@ -2,6 +2,7 @@ import numpy as np
 import periodictable
 from functools import reduce
 import jitr.utils.mass as mass
+from matplotlib import pyplot as plt
 
 from x4i3 import exfor_manager
 from x4i3.exfor_reactions import X4Reaction
@@ -62,6 +63,9 @@ label_matches = dict(
         ["Energy", "d(Angle)", "d(Data)", "Angle", "Data"],
     )
 )
+
+
+unit_symbols = {"no-dim": "unitless", "barns/ster": "b/Sr"}
 
 
 energyExParserList = [
@@ -1087,8 +1091,8 @@ def plot_angular_distributions(
         x_units = measurements[0][0].x_units
         y_units = measurements[0][0].y_units
     else:
-        x_units = measurements[0].x_units
-        y_units = measurements[0].y_units
+        x_units = unit_symbols.get(measurements[0].x_units, measurements[0].x_units)
+        y_units = unit_symbols.get(measurements[0].y_units, measurements[0].y_units)
 
     ax.set_xlabel(r"$\theta$ [{}]".format(x_units))
     ax.set_ylabel(r"{} [{}]".format(data_symbol, y_units))
