@@ -318,7 +318,12 @@ def parse_differential_data(
             ),
             match_units=angDistUnits + percentUnits + noUnits,
         )
-        icol = err_parser.firstMatch(data_set)
+
+        if label not in data_set.labels:
+            raise ValueError(f"Subentry does not have a column called {label}")
+        else:
+            icol = data_set.labels.index(label)
+
         if icol >= 0:
             err = err_parser.getColumn(icol, data_set)
             err_units = err[1]
@@ -517,7 +522,7 @@ def attempt_parse_subentry(
             err_treatment=err_treatment,
         )
     except Exception as e:
-        print(f"Failed to parse subentry {subentry}:\n{e}")
+        print(f"Failed to parse subentry {subentry}:\n\t{e}")
         failed_parses[subentry] = e
 
     return measurements, dict(failed_parses)
@@ -584,8 +589,8 @@ def get_measurements_from_subentry(
             err_treatment = "cumulative"
         else:
             raise NotImplementedError(
-                f"Subentry {subentry} has an ambiguous set of error labels:\n"
-                + "".join([f"{l}\n" for l in err_labels])
+                f"Subentry {subentry} has an ambiguous set of error labels:\n\t\t"
+                + "".join([f"{l}, " for l in err_labels])
             )
     else:
         assert err_treatment is not None
@@ -964,23 +969,17 @@ def set_label(
 
     # TODO when there is more than one measurement, make each subentry label correspond to its
     # corresponding color: https://matplotlib.org/1.5.0/examples/text_labels_and_annotations/rainbow_text.html
-    yc = y
     if label_xloc_deg is None:
         if x[0] > 20 and x[-1] > 150:
             label_xloc_deg = -18
-            # yc = y[ x < (x.min() + x.max()) / 2  ]
         if x[0] > 30 and x[-1] > 150:
             label_xloc_deg = 1
-            # yc = y[ x < (x.min() + x.max()) / 2  ]
         elif x[-1] < 140:
             label_xloc_deg = 145
-            yc = y[x > (x.min() + x.max()) / 2]
         else:
             label_xloc_deg = 175
-            yc = y[x > (x.min() + x.max()) / 2]
 
-    label_yloc = np.mean(yc)
-
+    label_yloc = offset
     if log:
         label_yloc *= label_offset_factor
     else:
@@ -1011,7 +1010,7 @@ def set_label(
             if i == len(measurements) - 1:
                 label += f"{m.subentry}"
             else:
-                label += f"{m.subentry}, "
+                label += f"{m.subentry},\n"
     if label_offset:
         label += offset_text
 

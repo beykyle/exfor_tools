@@ -9,6 +9,11 @@ from .exfor_tools import (
     get_db,
     filter_out_lab_angle,
     plot_angular_distributions,
+    parse_angle,
+    parse_inc_energy,
+    parse_ex_energy,
+    parse_differential_data,
+    parse_angular_distribution,
 )
 
 init_exfor_db()
