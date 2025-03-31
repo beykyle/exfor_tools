@@ -561,7 +561,6 @@ def get_measurements_from_subentry(
         ]
 
         err_labels_set = set(err_labels)
-        asymmetric_labels = set(["-DATA-ERR", "+DATA-ERR"])
         systematic_and_statistical_labels = set(["ERR-S", "ERR-SYS"])
         data_and_systematic_labels = set(["DATA-ERR", "ERR-SYS"])
 
@@ -579,14 +578,6 @@ def get_measurements_from_subentry(
             err_treatment = "independent"
         elif err_labels_set == data_and_systematic_labels:
             err_treatment = "independent"
-        elif err_labels_set.union(asymmetric_labels) == err_labels_set.intersection(
-            asymmetric_labels
-        ):
-            if vocal:
-                print(
-                    f"Warning: converting asymmetric errors to symmetric in subentry {subentry}"
-                )
-            err_treatment = "cumulative"
         else:
             raise NotImplementedError(
                 f"Subentry {subentry} has an ambiguous set of error labels:\n\t\t"
