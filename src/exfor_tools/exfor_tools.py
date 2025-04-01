@@ -286,7 +286,8 @@ def categorize_measurements_by_energy(all_entries, min_num_pts=5, Einc_tol=0.1):
 
 
 def parse_differential_data(
-    data_set, data_error_columns=["DATA-ERR"], err_treatment="independent"
+    data_set,
+    data_error_columns=["DATA-ERR"],
 ):
     r"""
     Extract differential cross section (potentially as ratio to Rutherford)
@@ -307,7 +308,7 @@ def parse_differential_data(
     xs = np.array(data_column[2:], dtype=np.float64)
 
     # parse errors
-    err_col_match = []
+    xs_err = []
     for label in data_error_columns:
 
         # parse error column
@@ -337,29 +338,13 @@ def parse_differential_data(
                     f"{err_units} for data column {data_column[0]} with units {xs_units}"
                 )
 
-            err_col_match.append(err_data)
-
-    if not err_col_match:
-        xs_err = np.zeros_like(xs)
-    elif err_treatment == "independent":
-        # sum errors in quadrature
-        xs_err = np.sqrt(np.sum(np.array(err_col_match) ** 2, axis=0))
-    elif err_treatment == "cumulative":
-        # add errors
-        xs_err = np.sum(np.array(err_col_match), axis=0)
-    elif err_treatment == "difference":
-        # subtract second error column from first
-        if len(err_col_match) > 2:
-            raise ValueError(
-                f"Cannot only take difference of 2 error columns, but {len(err_col_match)} were found!"
-            )
-        xs_err = err_col_match[0] - err_col_match[1]
+            xs_err.append(err_data)
 
     return xs, xs_err, xs_units
 
 
-# TODO handle Q-value and level number
 def parse_ex_energy(data_set):
+    # TODO handle Q-value and level number
     Ex = reduce(condenseColumn, [c.getValue(data_set) for c in energyExParserList])
 
     missing_Ex = np.all([a is None for a in Ex[2:]])
@@ -447,7 +432,6 @@ def parse_angular_distribution(
     subentry,
     data_set,
     data_error_columns=None,
-    err_treatment="independent",
     vocal=False,
 ):
     r"""
@@ -475,13 +459,15 @@ def parse_angular_distribution(
 
         # parse diff xs
         xs, xs_err, xs_units = parse_differential_data(
-            data_set, data_error_columns=data_error_columns, err_treatment=err_treatment
+            data_set, data_error_columns=data_error_columns
         )
     except Exception as e:
         new_exception = type(e)(f"Error while parsing {subentry}: {e}")
         raise new_exception from e
 
     N = data_set.numrows()
+    n_err_cols = len(xs_err)
+    data_err = np.zeros((n_err_cols, N))
     data = np.zeros((8, N))
 
     data[:, :] = [
@@ -492,10 +478,16 @@ def parse_angular_distribution(
         angle,
         np.nan_to_num(angle_err),
         xs,
-        np.nan_to_num(xs_err),
     ]
 
-    return data, (angle_units, Einc_units, Ex_units, xs_units)
+    data_err[:, :] = (np.nan_to_num(xs_err),)
+
+    return (
+        data,
+        data_err,
+        data_error_columns,
+        (angle_units, Einc_units, Ex_units, xs_units),
+    )
 
 
 def attempt_parse_subentry(
@@ -505,8 +497,6 @@ def attempt_parse_subentry(
     Ex_range=(0, np.inf),
     elastic_only=False,
     vocal=True,
-    err_labels=None,
-    err_treatment=None,
 ):
     failed_parses = {}
     measurements = []
@@ -518,8 +508,6 @@ def attempt_parse_subentry(
             Ex_range=Ex_range,
             elastic_only=elastic_only,
             vocal=vocal,
-            err_labels=err_labels,
-            err_treatment=err_treatment,
         )
     except Exception as e:
         print(f"Failed to parse subentry {subentry}:\n\t{e}")
@@ -535,8 +523,6 @@ def get_measurements_from_subentry(
     Ex_range=(0, np.inf),
     elastic_only=False,
     vocal=False,
-    err_labels=None,
-    err_treatment=None,
 ):
     r"""unrolls subentry into individual arrays for each energy"""
 
@@ -551,65 +537,52 @@ def get_measurements_from_subentry(
     ):
         return []
 
-    if err_labels is None:
-        lbl_frags_to_skip = ["ANG", "EN", "E-LVL", "E-EXC"]
-        err_labels = [
-            label
-            for label in data_set.labels
-            if "ERR" in label
-            and np.all([frag not in label for frag in lbl_frags_to_skip])
-        ]
+    lbl_frags_to_skip = ["ANG", "EN", "E-LVL", "E-EXC"]
+    err_labels = [
+        label
+        for label in data_set.labels
+        if "ERR" in label and np.all([frag not in label for frag in lbl_frags_to_skip])
+    ]
 
-        err_labels_set = set(err_labels)
-        systematic_and_statistical_labels = set(["ERR-S", "ERR-SYS"])
-        data_and_systematic_labels = set(["DATA-ERR", "ERR-SYS"])
-
-        if err_labels == []:
-            err_treatment = "independent"
-        elif err_labels == ["DATA-ERR"]:
-            err_treatment = "independent"
-        elif err_labels == ["ERR-DIG"]:
-            err_treatment = "independent"
-        elif err_labels == ["ERR-T"]:
-            err_treatment = "independent"
-        elif err_labels == ["ERR-S"]:
-            err_treatment = "independent"
-        elif err_labels_set == systematic_and_statistical_labels:
-            err_treatment = "independent"
-        elif err_labels_set == data_and_systematic_labels:
-            err_treatment = "independent"
-        else:
-            raise NotImplementedError(
-                f"Subentry {subentry} has an ambiguous set of error labels:\n\t\t"
-                + "".join([f"{l}, " for l in err_labels])
-            )
-    else:
-        assert err_treatment is not None
-
-    data, units = parse_angular_distribution(
+    data, data_err, error_columns, units = parse_angular_distribution(
         subentry,
         data_set,
         data_error_columns=err_labels,
-        err_treatment=err_treatment,
         vocal=vocal,
     )
 
     measurements = sort_subentry_data_by_energy(
-        subentry, data, Einc_range, Ex_range, elastic_only, units
+        subentry,
+        data,
+        data_err,
+        error_columns,
+        Einc_range,
+        Ex_range,
+        elastic_only,
+        units,
     )
     return measurements
 
 
 def sort_subentry_data_by_energy(
-    subentry, data, Einc_range, Ex_range, elastic_only, units
+    subentry,
+    data,
+    data_err,
+    error_columns,
+    Einc_range,
+    Ex_range,
+    elastic_only,
+    units,
 ):
     angle_units, Einc_units, Ex_units, xs_units = units
     Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] <= Einc_range[1])
     data = data[:, Einc_mask]
+    data_err = data[:, Einc_mask]
 
     if not elastic_only:
         Ex_mask = np.logical_and(data[2, :] >= Ex_range[0], data[2, :] <= Ex_range[1])
         data = data[:, Ex_mask]
+        data_err = data_err[:, Ex_mask]
 
     # AngularDistribution objects sorted by incident energy, then excitation energy
     # or just incident enrgy if elastic_only is True
@@ -627,7 +600,11 @@ def sort_subentry_data_by_energy(
             measurements.append(
                 AngularDistribution(
                     subentry,
-                    data[4:, mask],
+                    data[4, mask],
+                    data[5, mask],
+                    data[6, mask],
+                    [data_err[i, mask] for i in range(data_err.shape[0])],
+                    error_columns,
                     Einc,
                     Einc_err,
                     Einc_units,
@@ -640,6 +617,7 @@ def sort_subentry_data_by_energy(
             )
         else:
             subset = data[2:, mask]
+            subset_err = data_err[:, mask]
 
             # find set of unique residual excitation energies
             unique_Ex = np.unique(subset[0, :])
@@ -651,7 +629,11 @@ def sort_subentry_data_by_energy(
                 measurements.append(
                     AngularDistribution(
                         subentry,
-                        subset[2:, mask],
+                        subset[2, mask],
+                        subset[3, mask],
+                        subset[4, mask],
+                        [subset_err[i, mask] for i in range(data_err.shape[0])],
+                        error_columns,
                         Einc,
                         Einc_err,
                         Einc_units,
@@ -666,12 +648,17 @@ def sort_subentry_data_by_energy(
 
 
 class AngularDistribution:
-    r"""for a given incident and residual excitation energy stores angular distribution with x and y errors. x is angle in degrees. data is [x, x_err, y, y_err]. All energies in MeV."""
+    r"""for a given incident and residual excitation energy stores angular
+    distribution with x and y errors. x is angle in degrees."""
 
     def __init__(
         self,
         subentry: str,
-        data: np.array,
+        x: np.ndarray,
+        x_err: np.ndarray,
+        y: np.ndarray,
+        y_errs: list,
+        y_err_labels: list,
         Einc: float,
         Einc_err: float,
         Einc_units: str,
@@ -682,7 +669,6 @@ class AngularDistribution:
         y_units: str,
     ):
         self.subentry = subentry
-        self.data = data[:, data[0, :].argsort()]
         self.Einc = Einc
         self.Einc_err = Einc_err
         self.Einc_units = Einc_units
@@ -692,16 +678,83 @@ class AngularDistribution:
         self.x_units = x_units
         self.y_units = y_units
 
-        self.x = self.data[0, :]
-        self.y = self.data[2, :]
-        self.x_err = self.data[1, :]
-        self.y_err = self.data[3, :]
+        sort_by_angle = x.argsort()
+        self.x = x[sort_by_angle]
+        self.x_err = x_err[sort_by_angle]
+        self.y = y[sort_by_angle]
+        self.y_errs = [y_err[sort_by_angle] for y_err in y_errs]
+        self.y_err_labels = y_err_labels
+        self.rows = self.x.shape[0]
 
         assert (
             np.all(self.x[1:] - self.x[:-1] >= 0)
             and self.x[0] >= 0
             and self.x[-1] <= 180
         )
+
+
+class AngularDistributionStdErr(AngularDistribution):
+    r"""Specific case of AngularDistribution with one statistical and one systematic uncertainty"""
+
+    def __init__(
+        self,
+        *args,
+        statistical_err_labels=["DATA-ERR"],
+        statistical_err_treatment="independent",
+        systematic_err_labels=["ERR-SYS"],
+        systematic_err_treatment="independent",
+    ):
+        self.super().__init__(*args)
+
+        self.systematic_err = np.zeros(
+            (len(statistical_err_labels),),
+            dtype=np.float64,
+        )
+        self.statistical_err = np.zeros(
+            (
+                len(statistical_err_labels),
+                self.rows,
+            ),
+            dtype=np.float64,
+        )
+        for i, l in enumerate(statistical_err_labels):
+            if l not in self.y_err_labels:
+                raise ValueError(
+                    f"Did not find error column label {l} in subentry {self.subentry}"
+                )
+            else:
+                j = self.y_err_labels.index(l)
+                self.statistical_err[i, :] = self.y_errs[j]
+
+        if statistical_err_treatment == "independent":
+            self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
+        elif statistical_err_treatment == "difference":
+            self.statistical_err = np.diff(self.statistical_err, axis=0)
+        else:
+            raise ValueError(
+                f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
+            )
+
+        for i, l in enumerate(systematic_err_labels):
+            if l not in self.y_err_labels:
+                raise ValueError(
+                    f"Did not find error column label {l} in subentry {self.subentry}"
+                )
+            else:
+                j = self.y_err_labels.index(l)
+                err = self.y_errs[j]
+                if not np.all(err == err[0]):
+                    raise ValueError(
+                        f"Systematic error must be the same for all data points, but was not for column {l}"
+                    )
+                self.systematic_err[i] = err
+
+        if systematic_err_treatment == "independent":
+            self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
+        else:
+            raise ValueError(
+                f"Unknown systematic_err_treatment option: {systematic_err_treatment}"
+            )
 
 
 def get_symbol(A, Z, Ex=None):
