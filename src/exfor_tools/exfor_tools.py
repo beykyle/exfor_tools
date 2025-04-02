@@ -714,7 +714,7 @@ def parse_angular_distribution(
 
     if vocal:
         if len(xs_err) == 0 or np.all([np.allclose(d, 0) for d in xs_err]):
-            print(f"Warning: subentry {subentry} has 0 error")
+            print(f"Warning: subentry {subentry} has no reported data errors")
             xs_err = np.zeros((n_err_cols, N))
 
     data_err[:, :] = np.nan_to_num(xs_err)
