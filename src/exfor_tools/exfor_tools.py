@@ -130,6 +130,265 @@ energyExParserList = [
 ]
 
 
+class AngularDistribution:
+    """
+    Stores angular distribution with x and y errors for a given incident and residual
+    excitation energy. Allows for multiple y_errs with different labels.
+
+    Attributes:
+        subentry (str): Subentry identifier.
+        Einc (float): Incident energy.
+        Einc_err (float): Error in incident energy.
+        Einc_units (str): Units of incident energy.
+        Ex (float): Residual excitation energy.
+        Ex_err (float): Error in residual excitation energy.
+        Ex_units (str): Units of residual excitation energy.
+        x_units (str): Units of x (angle).
+        y_units (str): Units of y.
+        x (np.ndarray): Sorted angles in degrees.
+        x_err (np.ndarray): Errors in angles.
+        y (np.ndarray): Sorted y values.
+        y_errs (list): List of y errors.
+        y_err_labels (list): Labels for y errors.
+        rows (int): Number of data points.
+    """
+
+    def __init__(
+        self,
+        subentry,
+        x,
+        x_err,
+        y,
+        y_errs,
+        y_err_labels,
+        Einc,
+        Einc_err,
+        Einc_units,
+        Ex,
+        Ex_err,
+        Ex_units,
+        x_units,
+        y_units,
+    ):
+        self.subentry = subentry
+        self.Einc = Einc
+        self.Einc_err = Einc_err
+        self.Einc_units = Einc_units
+        self.Ex = Ex
+        self.Ex_err = Ex_err
+        self.Ex_units = Ex_units
+        self.x_units = x_units
+        self.y_units = y_units
+
+        sort_by_angle = x.argsort()
+        self.x = x[sort_by_angle]
+        self.x_err = x_err[sort_by_angle]
+        self.y = y[sort_by_angle]
+        self.y_errs = [y_err[sort_by_angle] for y_err in y_errs]
+        self.y_err_labels = y_err_labels
+        self.rows = self.x.shape[0]
+
+        assert (
+            np.all(self.x[1:] - self.x[:-1] >= 0)
+            and self.x[0] >= 0
+            and self.x[-1] <= 180
+        )
+
+
+def extract_syserr_labels(
+    labels,
+    allowed_sys_errs=set(["ERR-SYS"]),
+    allowed_stat_errs=set(["DATA-ERR", "ERR-T", "ERR-S"]),
+):
+    """
+    Extracts systematic error labels from a list of labels.
+
+    Parameters:
+    labels (list): A list of error labels.
+    allowed_sys_errs (set): A set of allowed systematic error labels.
+    allowed_stat_errs (set): A set of allowed statistical error labels.
+
+    Returns:
+    tuple: A tuple containing the remaining labels and a string "independent".
+
+    Raises:
+    ValueError: If the systematic error labels are ambiguous.
+    """
+    remains = [l for l in labels if l not in allowed_stat_errs]
+    if remains == ["ERR-SYS"]:
+        return remains, "independent"
+    else:
+        raise ValueError("Ambiguous systematic error labels:\n" + ", ".join(labels))
+
+
+def extract_staterr_labels(
+    labels,
+    allowed_sys_errs=set(["ERR-SYS"]),
+    allowed_stat_errs=set(["DATA-ERR", "ERR-T", "ERR-S"]),
+):
+    """
+    Extracts statistical error labels from a list of labels.
+
+    Parameters:
+    labels (list): A list of error labels.
+    allowed_sys_errs (set): A set of allowed systematic error labels.
+    allowed_stat_errs (set): A set of allowed statistical error labels.
+
+    Returns:
+    tuple: A tuple containing the remaining labels and a string "independent".
+
+    Raises:
+    ValueError: If the statistical error labels are ambiguous.
+    """
+    remains = [l for l in labels if l not in allowed_sys_errs]
+    if len(remains) == 1 and remains[0] in allowed_stat_errs:
+        return remains, "independent"
+    elif len(remains) == 2 and "ERR-DIG" in remains:
+        x = remains.copy()
+        x.remove("ERR-DIG")
+        if x[0] in allowed_stat_errs:
+            return remains, "independent"
+    else:
+        raise ValueError("Ambiguous statistical error labels:\n" + ", ".join(labels))
+
+
+class AngularDistributionStatErr(AngularDistribution):
+    """
+    AngularDistribution with one total statistical uncertainty.
+
+    Attributes:
+        statistical_err (np.ndarray): Total statistical error.
+    """
+
+    def __init__(
+        self,
+        *args,
+        statistical_err_labels=None,
+        statistical_err_treatment="independent",
+    ):
+        """
+        Initialize an AngularDistributionStatErr instance.
+
+        Args:
+            *args: Variable length argument list for the base class.
+            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to ["DATA-ERR"].
+            statistical_err_treatment (str, optional): Method to treat statistical errors.
+                Options are "independent" or "difference". Defaults to "independent".
+
+        Raises:
+            ValueError: If a column label in statistical_err_labels is not found in the subentry
+            or if an unknown statistical_err_treatment is provided.
+        """
+        super().__init__(*args)
+        if statistical_err_labels is None:
+            statistical_err_labels, statistical_err_treatment = extract_staterr_labels(
+                self.y_err_labels
+            )
+
+        self.statistical_err = np.zeros(
+            (len(statistical_err_labels), self.rows), dtype=np.float64
+        )
+
+        for i, label in enumerate(statistical_err_labels):
+            if label not in self.y_err_labels:
+                raise ValueError(
+                    f"Did not find error column label {label} in subentry {self.subentry}"
+                )
+            else:
+                index = self.y_err_labels.index(label)
+                self.statistical_err[i, :] = self.y_errs[index]
+
+        if statistical_err_treatment == "independent":
+            self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
+        elif statistical_err_treatment == "difference":
+            self.statistical_err = np.diff(self.statistical_err, axis=0)
+        else:
+            raise ValueError(
+                f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
+            )
+
+        self.y_err = self.statistical_err
+
+
+class AngularDistributionSysStatErr(AngularDistributionStatErr):
+    """
+    AngularDistribution with a statistical uncertainty, and one or both of a systematic normalization or
+        offset uncertainty
+
+    Attributes:
+        systematic_err (np.ndarray): Total systematic error.
+    """
+
+    def __init__(
+        self,
+        *args,
+        statistical_err_labels=["DATA-ERR"],
+        statistical_err_treatment="independent",
+        systematic_err_labels=["ERR-SYS"],
+        systematic_err_treatment="independent",
+    ):
+        """
+        Initialize an AngularDistributionSysStatErr instance.
+
+        Args:
+            *args: Variable length argument list for the base class.
+            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to ["DATA-ERR"].
+            statistical_err_treatment (str, optional): Method to treat statistical errors.
+                Options are "independent" or "difference". Defaults to "independent".
+            systematic_err_labels (list of str, optional): Labels for systematic errors. Defaults to ["ERR-SYS"].
+            systematic_err_treatment (str, optional): Method to treat systematic errors.
+                Options are "independent" or "difference". Defaults to "independent".
+
+        Raises:
+            ValueError: If a column label in systematic_err_labels is not found in the subentry
+            or if an unknown systematic_err_treatment is provided, or  the systematic error column
+            is non-uniform across angle.
+        """
+        super().__init__(
+            *args,
+            statistical_err_labels=statistical_err_labels,
+            statistical_err_treatment=statistical_err_treatment,
+        )
+
+        if systematic_err_labels is None:
+            systematic_err_labels, systematic_err_treatment = extract_syserr_labels(
+                self.y_err_labels
+            )
+
+        self.systematic_offset_err = []
+        self.systematic_norm_err = []
+
+        for i, label in enumerate(systematic_err_labels):
+            if label not in self.y_err_labels:
+                raise ValueError(
+                    f"Did not find error column label {label} in subentry {self.subentry}"
+                )
+            else:
+                index = self.y_err_labels.index(label)
+                err = self.y_errs[index]
+                ratio = err / self.y
+                if np.isclose(ratio, ratio[0]):
+                    self.systematic_norm_err.append(ratio[0])
+                elif np.isclose(err, err[0]):
+                    self.systematic_offset_err.append(err[0])
+                else:
+                    raise ValueError(
+                        "Systematic error must be either a constant ratio or a constant factor across all angles."
+                    )
+
+        if systematic_err_treatment == "independent":
+            self.systematic_offset_err = np.sqrt(
+                np.sum(self.systematic_offset_err**2, axis=0)
+            )
+            self.systematic_norm_err = np.sqrt(
+                np.sum(self.systematic_norm_err**2, axis=0)
+            )
+        else:
+            raise ValueError(
+                f"Unknown systematic_err_treatment option: {systematic_err_treatment}"
+            )
+
+
 def sanitize_column(col):
     for i in range(len(col)):
         if col[i] is None:
@@ -137,74 +396,44 @@ def sanitize_column(col):
     return col
 
 
-def query_for_entries(
-    target: tuple,
-    projectile: tuple,
-    quantity: str,
-    residual: tuple = None,
-    product: tuple = None,
-    special_rxn_type="",
-    Einc_range: tuple = None,
-    Ex_range: tuple = None,
-    vocal=False,
-    filter_subentries=lambda subentry: len(subentry.labels) >= 2,
-    mass_kwargs={},
-    parsing_kwargs={},
-):
-    r"""query EXFOR for all entries satisfying search criteria, and return them
-    as a dictionary of entry number to ExforEntryAngularDistribution"""
+def query_for_entries(projectile, target, quantity, **kwargs):
+    """
+    Query for entries in the EXFOR database based on projectile, target, and quantity.
 
-    A, Z = target
-    target_symbol = f"{str(periodictable.elements[Z])}-{A}"
+    :param projectile: Tuple representing the projectile (A, Z).
+    :param target: Tuple representing the target (A, Z).
+    :param quantity: The quantity to query.
+    :param kwargs: Additional keyword arguments for entry parsing.
+    :return: A tuple containing successfully parsed entries and failed entries.
+    """
+    target_symbol = f"{str(periodictable.elements[target[1]])}-{target[0]}"
 
-    A, Z = projectile
-    if (A, Z) == (1, 0):
-        projectile_symbol = "N"
-    elif (A, Z) == (1, 1):
-        projectile_symbol = "P"
-    elif (A, Z) == (2, 1):
-        projectile_symbol = "D"
-    elif (A, Z) == (3, 1):
-        projectile_symbol = "T"
-    elif (A, Z) == (4, 2):
-        projectile_symbol = "A"
-    else:
-        projectile_symbol = f"{str(periodictable.elements[Z])}-{A}"
+    projectile_symbol = {
+        (1, 0): "N",
+        (1, 1): "P",
+        (2, 1): "D",
+        (3, 1): "T",
+        (4, 2): "A"
+    }.get(projectile, f"{str(periodictable.elements[projectile[1]])}-{projectile[0]}")
 
     exfor_quantity = quantity_matches[quantity][0][0]
     entries = __EXFOR_DB__.query(
         quantity=exfor_quantity,
         target=target_symbol,
-        projectile=projectile_symbol,
+        projectile=projectile_symbol
     ).keys()
 
     successfully_parsed_entries = {}
     failed_entries = {}
+
     for entry in entries:
         try:
-            parsed_entry = ExforEntryAngularDistribution(
-                entry=entry,
-                target=target,
-                projectile=projectile,
-                quantity=quantity,
-                residual=residual,
-                product=product,
-                special_rxn_type=special_rxn_type,
-                Einc_range=Einc_range,
-                Ex_range=Ex_range,
-                mass_kwargs=mass_kwargs,
-                parsing_kwargs=parsing_kwargs,
-                vocal=vocal,
-                filter_subentries=filter_subentries,
-            )
-
+            parsed_entry = ExforEntryAngularDistribution(entry, target, projectile, quantity, **kwargs)
+            if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
+                successfully_parsed_entries[entry] = parsed_entry
         except Exception as e:
             print(f"There was an error reading entry {entry}, it will be skipped:")
             print(e)
-        if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
-            assert entry not in successfully_parsed_entries
-            successfully_parsed_entries[entry] = parsed_entry
-        elif len(parsed_entry.failed_parses) > 0:
             failed_entries[entry] = parsed_entry
 
     return successfully_parsed_entries, failed_entries
@@ -468,7 +697,7 @@ def parse_angular_distribution(
     N = data_set.numrows()
     n_err_cols = len(xs_err)
     data_err = np.zeros((n_err_cols, N))
-    data = np.zeros((8, N))
+    data = np.zeros((7, N))
 
     data[:, :] = [
         Einc_lab,
@@ -480,7 +709,7 @@ def parse_angular_distribution(
         xs,
     ]
 
-    data_err[:, :] = (np.nan_to_num(xs_err),)
+    data_err[:, :] = np.nan_to_num(xs_err)
 
     return (
         data,
@@ -490,26 +719,13 @@ def parse_angular_distribution(
     )
 
 
-def attempt_parse_subentry(
-    subentry,
-    data_set,
-    Einc_range=(0, np.inf),
-    Ex_range=(0, np.inf),
-    elastic_only=False,
-    vocal=True,
-):
+def attempt_parse_subentry(*args, **kwargs):
     failed_parses = {}
     measurements = []
     try:
-        measurements = get_measurements_from_subentry(
-            subentry=subentry,
-            data_set=data_set,
-            Einc_range=Einc_range,
-            Ex_range=Ex_range,
-            elastic_only=elastic_only,
-            vocal=vocal,
-        )
+        measurements = get_measurements_from_subentry(*args, **kwargs)
     except Exception as e:
+        subentry = args[0]
         print(f"Failed to parse subentry {subentry}:\n\t{e}")
         failed_parses[subentry] = e
 
@@ -523,6 +739,8 @@ def get_measurements_from_subentry(
     Ex_range=(0, np.inf),
     elastic_only=False,
     vocal=False,
+    MeasurementClass=AngularDistribution,
+    parsing_kwargs={},
 ):
     r"""unrolls subentry into individual arrays for each energy"""
 
@@ -551,7 +769,11 @@ def get_measurements_from_subentry(
         vocal=vocal,
     )
 
-    measurements = sort_subentry_data_by_energy(
+    if vocal:
+        if error_columns == [] or np.all([np.allclose(d, 0) for d in data_err]):
+            print(f"Warning: subentry {subentry} has 0 error")
+
+    measurement_data = sort_subentry_data_by_energy(
         subentry,
         data,
         data_err,
@@ -561,6 +783,7 @@ def get_measurements_from_subentry(
         elastic_only,
         units,
     )
+    measurements = [MeasurementClass(*m, **parsing_kwargs) for m in measurement_data]
     return measurements
 
 
@@ -577,7 +800,7 @@ def sort_subentry_data_by_energy(
     angle_units, Einc_units, Ex_units, xs_units = units
     Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] <= Einc_range[1])
     data = data[:, Einc_mask]
-    data_err = data[:, Einc_mask]
+    data_err = data_err[:, Einc_mask]
 
     if not elastic_only:
         Ex_mask = np.logical_and(data[2, :] >= Ex_range[0], data[2, :] <= Ex_range[1])
@@ -598,7 +821,7 @@ def sort_subentry_data_by_energy(
 
         if elastic_only:
             measurements.append(
-                AngularDistribution(
+                (
                     subentry,
                     data[4, mask],
                     data[5, mask],
@@ -627,7 +850,7 @@ def sort_subentry_data_by_energy(
                 mask = np.isclose(subset[0, :], Ex)
                 Ex_err = subset[1, mask][0]
                 measurements.append(
-                    AngularDistribution(
+                    (
                         subentry,
                         subset[2, mask],
                         subset[3, mask],
@@ -645,116 +868,6 @@ def sort_subentry_data_by_energy(
                     )
                 )
     return measurements
-
-
-class AngularDistribution:
-    r"""for a given incident and residual excitation energy stores angular
-    distribution with x and y errors. x is angle in degrees."""
-
-    def __init__(
-        self,
-        subentry: str,
-        x: np.ndarray,
-        x_err: np.ndarray,
-        y: np.ndarray,
-        y_errs: list,
-        y_err_labels: list,
-        Einc: float,
-        Einc_err: float,
-        Einc_units: str,
-        Ex: float,
-        Ex_err: float,
-        Ex_units: str,
-        x_units: str,
-        y_units: str,
-    ):
-        self.subentry = subentry
-        self.Einc = Einc
-        self.Einc_err = Einc_err
-        self.Einc_units = Einc_units
-        self.Ex = Ex
-        self.Ex_err = Ex_err
-        self.Ex_units = Ex_units
-        self.x_units = x_units
-        self.y_units = y_units
-
-        sort_by_angle = x.argsort()
-        self.x = x[sort_by_angle]
-        self.x_err = x_err[sort_by_angle]
-        self.y = y[sort_by_angle]
-        self.y_errs = [y_err[sort_by_angle] for y_err in y_errs]
-        self.y_err_labels = y_err_labels
-        self.rows = self.x.shape[0]
-
-        assert (
-            np.all(self.x[1:] - self.x[:-1] >= 0)
-            and self.x[0] >= 0
-            and self.x[-1] <= 180
-        )
-
-
-class AngularDistributionStdErr(AngularDistribution):
-    r"""Specific case of AngularDistribution with one statistical and one systematic uncertainty"""
-
-    def __init__(
-        self,
-        *args,
-        statistical_err_labels=["DATA-ERR"],
-        statistical_err_treatment="independent",
-        systematic_err_labels=["ERR-SYS"],
-        systematic_err_treatment="independent",
-    ):
-        self.super().__init__(*args)
-
-        self.systematic_err = np.zeros(
-            (len(statistical_err_labels),),
-            dtype=np.float64,
-        )
-        self.statistical_err = np.zeros(
-            (
-                len(statistical_err_labels),
-                self.rows,
-            ),
-            dtype=np.float64,
-        )
-        for i, l in enumerate(statistical_err_labels):
-            if l not in self.y_err_labels:
-                raise ValueError(
-                    f"Did not find error column label {l} in subentry {self.subentry}"
-                )
-            else:
-                j = self.y_err_labels.index(l)
-                self.statistical_err[i, :] = self.y_errs[j]
-
-        if statistical_err_treatment == "independent":
-            self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
-        elif statistical_err_treatment == "difference":
-            self.statistical_err = np.diff(self.statistical_err, axis=0)
-        else:
-            raise ValueError(
-                f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
-            )
-
-        for i, l in enumerate(systematic_err_labels):
-            if l not in self.y_err_labels:
-                raise ValueError(
-                    f"Did not find error column label {l} in subentry {self.subentry}"
-                )
-            else:
-                j = self.y_err_labels.index(l)
-                err = self.y_errs[j]
-                if not np.all(err == err[0]):
-                    raise ValueError(
-                        f"Systematic error must be the same for all data points, but was not for column {l}"
-                    )
-                self.systematic_err[i] = err
-
-        if systematic_err_treatment == "independent":
-            self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
-        else:
-            raise ValueError(
-                f"Unknown systematic_err_treatment option: {systematic_err_treatment}"
-            )
 
 
 def get_symbol(A, Z, Ex=None):
@@ -816,6 +929,7 @@ class ExforEntryAngularDistribution:
         vocal=False,
         filter_subentries=filter_out_lab_angle,
         mass_kwargs={},
+        MeasurementClass=AngularDistribution,
         parsing_kwargs={},
     ):
         r""" """
@@ -950,12 +1064,13 @@ class ExforEntryAngularDistribution:
                 "institute": data_set.institute,
             }
             measurements, failed_parses = attempt_parse_subentry(
-                subentry=key[1],
-                data_set=data_set,
+                key[1],
+                data_set,
                 Einc_range=self.Einc_range,
                 Ex_range=self.Ex_range,
                 elastic_only=elastic_only,
                 vocal=vocal,
+                MeasurementClass=MeasurementClass,
                 **parsing_kwargs,
             )
             for m in measurements:

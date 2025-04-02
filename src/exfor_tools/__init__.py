@@ -5,6 +5,7 @@ from .exfor_tools import (
     get_measurements_from_subentry,
     ExforEntryAngularDistribution,
     AngularDistribution,
+    AngularDistributionSysStatErr,
     init_exfor_db,
     get_db,
     filter_out_lab_angle,
