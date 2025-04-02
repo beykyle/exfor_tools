@@ -2,7 +2,6 @@ import numpy as np
 import periodictable
 from functools import reduce
 import jitr.utils.mass as mass
-from matplotlib import pyplot as plt
 
 from x4i3 import exfor_manager
 from x4i3.exfor_reactions import X4Reaction
