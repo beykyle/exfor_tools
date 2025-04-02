@@ -217,7 +217,7 @@ def extract_syserr_labels(
     if remains == ["ERR-SYS"] or remains == []:
         return remains, "independent"
     else:
-        raise ValueError("Ambiguous systematic error labels:\n\t\t" + ", ".join(labels))
+        raise ValueError("Ambiguous systematic error labels: " + ", ".join(labels))
 
 
 def extract_staterr_labels(
@@ -712,6 +712,11 @@ def parse_angular_distribution(
         xs,
     ]
 
+    if vocal:
+        if len(xs_err) == 0 or np.all([np.allclose(d, 0) for d in xs_err]):
+            print(f"Warning: subentry {subentry} has 0 error")
+            xs_err = np.zeros((n_err_cols, N))
+
     data_err[:, :] = np.nan_to_num(xs_err)
 
     return (
@@ -771,10 +776,6 @@ def get_measurements_from_subentry(
         data_error_columns=err_labels,
         vocal=vocal,
     )
-
-    if vocal:
-        if error_columns == [] or np.all([np.allclose(d, 0) for d in data_err]):
-            print(f"Warning: subentry {subentry} has 0 error")
 
     measurement_data = sort_subentry_data_by_energy(
         subentry,
