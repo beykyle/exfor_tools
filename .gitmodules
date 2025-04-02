@@ -1,0 +1,3 @@
+[submodule "x4i3_tools"]
+	path = x4i3_tools
+	url = git@github.com:afedynitch/x4i3_tools.git
