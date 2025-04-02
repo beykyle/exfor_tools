@@ -426,18 +426,12 @@ def query_for_entries(projectile, target, quantity, **kwargs):
     failed_entries = {}
 
     for entry in entries:
-        try:
-            parsed_entry = ExforEntryAngularDistribution(
-                entry, target, projectile, quantity, **kwargs
-            )
-            if (
-                len(parsed_entry.failed_parses) == 0
-                and len(parsed_entry.measurements) > 0
-            ):
-                successfully_parsed_entries[entry] = parsed_entry
-        except Exception as e:
-            print(f"There was an error reading entry {entry}, it will be skipped:")
-            print(e)
+        parsed_entry = ExforEntryAngularDistribution(
+            entry, target, projectile, quantity, **kwargs
+        )
+        if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
+            successfully_parsed_entries[entry] = parsed_entry
+        elif len(parsed_entry.failed_parses) > 0:
             failed_entries[entry] = parsed_entry
 
     return successfully_parsed_entries, failed_entries
