@@ -24,3 +24,6 @@ fi
 
 python3 ./x4i3_tool/setup_exfor_db.py  --exfor-master "$path_to_zipfile"
 python setup_exfor_db.py --exfor-master "$path_to_zipfile" --rename="X4-$year-12-31" --create-x4i3-tarfile
+
+export X43I_DATAPATH="$db_dir/unpack_exfor-$year/X4-$year-12-31"
+echo "setting 'X43I_DATAPATH' to $X43I_DATAPATH"
