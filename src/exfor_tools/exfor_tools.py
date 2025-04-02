@@ -218,7 +218,7 @@ def extract_syserr_labels(
     if remains == ["ERR-SYS"] or remains == []:
         return remains, "independent"
     else:
-        raise ValueError("Ambiguous systematic error labels:\n" + ", ".join(labels))
+        raise ValueError("Ambiguous systematic error labels:\n\t\t" + ", ".join(labels))
 
 
 def extract_staterr_labels(
