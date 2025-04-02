@@ -215,7 +215,7 @@ def extract_syserr_labels(
     ValueError: If the systematic error labels are ambiguous.
     """
     remains = [l for l in labels if l not in allowed_stat_errs]
-    if remains == ["ERR-SYS"]:
+    if remains == ["ERR-SYS"] or remains == []:
         return remains, "independent"
     else:
         raise ValueError("Ambiguous systematic error labels:\n" + ", ".join(labels))
@@ -241,7 +241,7 @@ def extract_staterr_labels(
     ValueError: If the statistical error labels are ambiguous.
     """
     remains = [l for l in labels if l not in allowed_sys_errs]
-    if len(remains) == 1 and remains[0] in allowed_stat_errs:
+    if (len(remains) == 1 and remains[0] in allowed_stat_errs) or len(remains) == 0:
         return remains, "independent"
     elif len(remains) == 2 and "ERR-DIG" in remains:
         x = remains.copy()
@@ -322,9 +322,9 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
     def __init__(
         self,
         *args,
-        statistical_err_labels=["DATA-ERR"],
+        statistical_err_labels=None,
         statistical_err_treatment="independent",
-        systematic_err_labels=["ERR-SYS"],
+        systematic_err_labels=None,
         systematic_err_treatment="independent",
     ):
         """
@@ -367,15 +367,17 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
                 index = self.y_err_labels.index(label)
                 err = self.y_errs[index]
                 ratio = err / self.y
-                if np.isclose(ratio, ratio[0]):
+                if np.allclose(ratio, ratio[0]):
                     self.systematic_norm_err.append(ratio[0])
-                elif np.isclose(err, err[0]):
+                elif np.allclose(err, err[0]):
                     self.systematic_offset_err.append(err[0])
                 else:
                     raise ValueError(
                         "Systematic error must be either a constant ratio or a constant factor across all angles."
                     )
 
+        self.systematic_norm_err = np.array(self.systematic_norm_err)
+        self.systematic_offset_err = np.array(self.systematic_offset_err)
         if systematic_err_treatment == "independent":
             self.systematic_offset_err = np.sqrt(
                 np.sum(self.systematic_offset_err**2, axis=0)
@@ -413,14 +415,12 @@ def query_for_entries(projectile, target, quantity, **kwargs):
         (1, 1): "P",
         (2, 1): "D",
         (3, 1): "T",
-        (4, 2): "A"
+        (4, 2): "A",
     }.get(projectile, f"{str(periodictable.elements[projectile[1]])}-{projectile[0]}")
 
     exfor_quantity = quantity_matches[quantity][0][0]
     entries = __EXFOR_DB__.query(
-        quantity=exfor_quantity,
-        target=target_symbol,
-        projectile=projectile_symbol
+        quantity=exfor_quantity, target=target_symbol, projectile=projectile_symbol
     ).keys()
 
     successfully_parsed_entries = {}
@@ -428,8 +428,13 @@ def query_for_entries(projectile, target, quantity, **kwargs):
 
     for entry in entries:
         try:
-            parsed_entry = ExforEntryAngularDistribution(entry, target, projectile, quantity, **kwargs)
-            if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
+            parsed_entry = ExforEntryAngularDistribution(
+                entry, target, projectile, quantity, **kwargs
+            )
+            if (
+                len(parsed_entry.failed_parses) == 0
+                and len(parsed_entry.measurements) > 0
+            ):
                 successfully_parsed_entries[entry] = parsed_entry
         except Exception as e:
             print(f"There was an error reading entry {entry}, it will be skipped:")
@@ -573,7 +578,6 @@ def parse_differential_data(
 
 
 def parse_ex_energy(data_set):
-    # TODO handle Q-value and level number
     Ex = reduce(condenseColumn, [c.getValue(data_set) for c in energyExParserList])
 
     missing_Ex = np.all([a is None for a in Ex[2:]])
@@ -929,7 +933,7 @@ class ExforEntryAngularDistribution:
         vocal=False,
         filter_subentries=filter_out_lab_angle,
         mass_kwargs={},
-        MeasurementClass=AngularDistribution,
+        MeasurementClass=AngularDistributionSysStatErr,
         parsing_kwargs={},
     ):
         r""" """
@@ -1071,7 +1075,7 @@ class ExforEntryAngularDistribution:
                 elastic_only=elastic_only,
                 vocal=vocal,
                 MeasurementClass=MeasurementClass,
-                **parsing_kwargs,
+                parsing_kwargs=parsing_kwargs,
             )
             for m in measurements:
                 self.measurements.append(m)
