@@ -196,8 +196,8 @@ class AngularDistribution:
 
 def extract_syserr_labels(
     labels,
-    allowed_sys_errs=set(["ERR-SYS"]),
-    allowed_stat_errs=set(["DATA-ERR", "ERR-T", "ERR-S"]),
+    allowed_sys_errs=frozenset(["ERR-SYS"]),
+    allowed_stat_errs=frozenset(["DATA-ERR", "ERR-T", "ERR-S"]),
 ):
     """
     Extracts systematic error labels from a list of labels.
@@ -208,22 +208,26 @@ def extract_syserr_labels(
     allowed_stat_errs (set): A set of allowed statistical error labels.
 
     Returns:
-    tuple: A tuple containing the remaining labels and a string "independent".
+    tuple: A tuple containing the systematic error labels and a string specifying the treatment
+
+    Raises:
+    ValueError: If the statistical error labels are ambiguous
 
     Raises:
     ValueError: If the systematic error labels are ambiguous.
     """
-    remains = [l for l in labels if l not in allowed_stat_errs]
-    if remains == ["ERR-SYS"] or remains == []:
-        return remains, "independent"
+    allowed_sys_err_combos = frozenset([frozenset(l) for l in allowed_sys_errs])
+    sys_err_labels = frozenset(labels) - allowed_stat_errs
+    if sys_err_labels in allowed_sys_err_combos:
+        return list(sys_err_labels), "independent"
     else:
         raise ValueError("Ambiguous systematic error labels: " + ", ".join(labels))
 
 
 def extract_staterr_labels(
     labels,
-    allowed_sys_errs=set(["ERR-SYS"]),
-    allowed_stat_errs=set(["DATA-ERR", "ERR-T", "ERR-S"]),
+    allowed_sys_errs=frozenset(["ERR-SYS"]),
+    allowed_stat_errs=frozenset(["DATA-ERR", "ERR-T", "ERR-S"]),
 ):
     """
     Extracts statistical error labels from a list of labels.
@@ -234,19 +238,18 @@ def extract_staterr_labels(
     allowed_stat_errs (set): A set of allowed statistical error labels.
 
     Returns:
-    tuple: A tuple containing the remaining labels and a string "independent".
+    tuple: A tuple containing the statistical error labels and a string specifying the treatment
 
     Raises:
-    ValueError: If the statistical error labels are ambiguous.
+    ValueError: If the statistical error labels are ambiguous
     """
-    remains = [l for l in labels if l not in allowed_sys_errs]
-    if (len(remains) == 1 and remains[0] in allowed_stat_errs) or len(remains) == 0:
-        return remains, "independent"
-    elif len(remains) == 2 and "ERR-DIG" in remains:
-        x = remains.copy()
-        x.remove("ERR-DIG")
-        if x[0] in allowed_stat_errs:
-            return remains, "independent"
+    allowed_stat_err_combos = set(
+        [frozenset([l, "ERR-DIG"]) for l in allowed_stat_errs]
+        + [frozenset([l]) for l in allowed_stat_errs]
+    )
+    stat_err_labels = frozenset(labels) - allowed_sys_errs
+    if stat_err_labels in allowed_stat_err_combos:
+        return list(stat_err_labels), "independent"
     else:
         raise ValueError("Ambiguous statistical error labels:\n" + ", ".join(labels))
 
