@@ -39,21 +39,6 @@ def init_exfor_db():
         __EXFOR_DB__ = exfor_manager.X4DBManagerDefault()
 
 
-def get_db():
-    """
-    Retrieve the EXFOR database manager.
-
-    This function returns the global EXFOR database manager, initializing it if necessary.
-
-    Returns:
-        The global EXFOR database manager instance.
-    """
-    global __EXFOR_DB__
-    if __EXFOR_DB__ is None:
-        init_exfor_db()
-    return __EXFOR_DB__
-
-
 # these are the supported quantities at the moment
 # XS = cross section, A = angle, Ruth = Rutherford cross section, Ay = analyzing power
 quantity_matches = {

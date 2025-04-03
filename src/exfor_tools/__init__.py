@@ -7,7 +7,6 @@ from .exfor_tools import (
     AngularDistribution,
     AngularDistributionSysStatErr,
     init_exfor_db,
-    get_db,
     filter_out_lab_angle,
     plot_angular_distributions,
     parse_angle,
@@ -15,6 +14,7 @@ from .exfor_tools import (
     parse_ex_energy,
     parse_differential_data,
     parse_angular_distribution,
+    __EXFOR_DB__,
 )
 
 init_exfor_db()
