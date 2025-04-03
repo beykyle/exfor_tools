@@ -512,7 +512,7 @@ def categorize_measurements_by_energy(all_entries, min_num_pts=5, Einc_tol=0.1):
     measurements = []
     for entry, data in all_entries.items():
         for measurement in data.measurements:
-            if measurement.data.shape[1] > min_num_pts:
+            if measurement.x.shape[0] > min_num_pts:
                 measurements.append(measurement)
     return categorize_measurement_list(
         measurements, min_num_pts=min_num_pts, Einc_tol=Einc_tol
