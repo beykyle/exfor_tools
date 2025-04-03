@@ -945,7 +945,7 @@ class ExforEntryAngularDistribution:
         mass_kwargs={},
         MeasurementClass=AngularDistributionSysStatErr,
         parsing_kwargs={},
-        filter_kwargs={}
+        filter_kwargs={},
     ):
         r""" """
         self.vocal = vocal
