@@ -303,7 +303,7 @@ class AngularDistributionStatErr(AngularDistribution):
         if statistical_err_treatment == "independent":
             self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
         elif statistical_err_treatment == "difference":
-            self.statistical_err = np.diff(self.statistical_err, axis=0)
+            self.statistical_err = -np.diff(self.statistical_err, axis=0)
         else:
             raise ValueError(
                 f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
@@ -898,7 +898,7 @@ def get_symbol(A, Z, Ex=None):
             return f"$^{{{A}}}${str(periodictable.elements[Z])}{ex}"
 
 
-def filter_out_lab_angle(data_set):
+def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4):
     angle_labels = [
         l
         for l in data_set.labels
@@ -913,12 +913,18 @@ def filter_out_lab_angle(data_set):
             )
         )
     ]
+
     if len(angle_labels) > 1:
         raise ValueError(f"Too many angle columns: {angle_labels}")
     elif len(angle_labels) == 0:
         return False
-    else:
-        return "-CM" in angle_labels[0]
+    if min_num_pts is not None:
+        if data_set.numrows() < min_num_pts:
+            return False
+    if filter_lab_angle:
+        if "-CM" not in angle_labels[0]:
+            return False
+    return True
 
 
 class ExforEntryAngularDistribution:
@@ -936,10 +942,10 @@ class ExforEntryAngularDistribution:
         Einc_range: tuple = None,
         Ex_range: tuple = None,
         vocal=False,
-        filter_subentries=filter_out_lab_angle,
         mass_kwargs={},
         MeasurementClass=AngularDistributionSysStatErr,
         parsing_kwargs={},
+        filter_kwargs={}
     ):
         r""" """
         self.vocal = vocal
@@ -1062,7 +1068,7 @@ class ExforEntryAngularDistribution:
             if quantity not in self.exfor_quantities:
                 continue
 
-            if not filter_subentries(data_set):
+            if not filter_subentries(data_set, **filter_kwargs):
                 continue
 
             # should be the same for every subentry

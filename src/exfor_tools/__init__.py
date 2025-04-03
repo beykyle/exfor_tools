@@ -7,7 +7,6 @@ from .exfor_tools import (
     AngularDistribution,
     AngularDistributionSysStatErr,
     init_exfor_db,
-    filter_out_lab_angle,
     plot_angular_distributions,
     parse_angle,
     parse_inc_energy,
