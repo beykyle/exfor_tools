@@ -557,10 +557,13 @@ def parse_differential_data(
         if label not in data_set.labels:
             raise ValueError(f"Subentry does not have a column called {label}")
         else:
-            icol = data_set.labels.index(label)
+            iyerr = [idx for idx, value in enumerate(data_set.labels) if value == label]
+            if len(iyerr) > 1:
+                raise ValueError(
+                    f"Expected only one {label} column, found {len(iyerr)}"
+                )
 
-        if icol >= 0:
-            err = err_parser.getColumn(icol, data_set)
+            err = err_parser.getColumn(iyerr, data_set)
             err_units = err[1]
             err_data = np.array(sanitize_column(err[2:]), dtype=np.float64)
             # convert to same units as data
