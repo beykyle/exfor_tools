@@ -914,9 +914,7 @@ def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4):
         )
     ]
 
-    if len(angle_labels) > 1:
-        raise ValueError(f"Too many angle columns: {angle_labels}")
-    elif len(angle_labels) == 0:
+    if len(angle_labels) == 0:
         return False
     if min_num_pts is not None:
         if data_set.numrows() < min_num_pts:
