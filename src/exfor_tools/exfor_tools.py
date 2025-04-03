@@ -217,7 +217,7 @@ def extract_syserr_labels(
     ValueError: If the systematic error labels are ambiguous.
     """
     allowed_sys_err_combos = frozenset([frozenset(l) for l in allowed_sys_errs])
-    sys_err_labels = frozenset(labels) - allowed_stat_errs
+    sys_err_labels = frozenset(labels) - allowed_stat_errs - frozenset(["ERR-DIG"])
     if len(sys_err_labels) == 0:
         return [], "independent"
     if sys_err_labels in allowed_sys_err_combos:
@@ -247,7 +247,7 @@ def extract_staterr_labels(
     """
     allowed_stat_err_combos = set(
         [frozenset([l, "ERR-DIG"]) for l in allowed_stat_errs]
-        + [frozenset([l]) for l in allowed_stat_errs]
+        + [frozenset([l]) for l in allowed_stat_errs | frozenset(["ERR-DIG"])]
     )
     stat_err_labels = frozenset(labels) - allowed_sys_errs
     if len(stat_err_labels) == 0:
