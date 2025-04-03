@@ -183,6 +183,7 @@ def extract_syserr_labels(
     labels,
     allowed_sys_errs=frozenset(["ERR-SYS"]),
     allowed_stat_errs=frozenset(["DATA-ERR", "ERR-T", "ERR-S"]),
+    expected_stat_errs=frozenset([]),
 ):
     """
     Extracts systematic error labels from a list of labels.
@@ -201,8 +202,13 @@ def extract_syserr_labels(
     Raises:
     ValueError: If the systematic error labels are ambiguous.
     """
-    allowed_sys_err_combos = frozenset([frozenset(l) for l in allowed_sys_errs])
-    sys_err_labels = frozenset(labels) - allowed_stat_errs - frozenset(["ERR-DIG"])
+    allowed_sys_err_combos = frozenset([frozenset([l]) for l in allowed_sys_errs])
+    sys_err_labels = (
+        frozenset(labels)
+        - allowed_stat_errs
+        - frozenset(["ERR-DIG"])
+        - expected_stat_errs
+    )
     if len(sys_err_labels) == 0:
         return [], "independent"
     if sys_err_labels in allowed_sys_err_combos:
@@ -215,6 +221,7 @@ def extract_staterr_labels(
     labels,
     allowed_sys_errs=frozenset(["ERR-SYS"]),
     allowed_stat_errs=frozenset(["DATA-ERR", "ERR-T", "ERR-S"]),
+    expected_sys_errs=frozenset([]),
 ):
     """
     Extracts statistical error labels from a list of labels.
@@ -234,7 +241,7 @@ def extract_staterr_labels(
         [frozenset([l, "ERR-DIG"]) for l in allowed_stat_errs]
         + [frozenset([l]) for l in allowed_stat_errs | frozenset(["ERR-DIG"])]
     )
-    stat_err_labels = frozenset(labels) - allowed_sys_errs
+    stat_err_labels = frozenset(labels) - allowed_sys_errs - expected_sys_errs
     if len(stat_err_labels) == 0:
         return [], "independent"
     if stat_err_labels in allowed_stat_err_combos:
@@ -254,26 +261,30 @@ class AngularDistributionStatErr(AngularDistribution):
     def __init__(
         self,
         *args,
-        statistical_err_labels=None,
+        statistical_err_labels=[],
         statistical_err_treatment="independent",
+        systematic_err_labels=[],
     ):
         """
         Initialize an AngularDistributionStatErr instance.
 
         Args:
             *args: Variable length argument list for the base class.
-            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to ["DATA-ERR"].
+            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to [].
             statistical_err_treatment (str, optional): Method to treat statistical errors.
                 Options are "independent" or "difference". Defaults to "independent".
+            statistical_err_labels (list of str, optional): Labels for systematic errors. Defaults to []. Only
+                relevant if statistical_err_labels is empty, meaning automatic parsing will be attempted.
 
         Raises:
             ValueError: If a column label in statistical_err_labels is not found in the subentry
             or if an unknown statistical_err_treatment is provided.
         """
         super().__init__(*args)
-        if statistical_err_labels is None:
+        if not statistical_err_labels:
             statistical_err_labels, statistical_err_treatment = extract_staterr_labels(
-                self.y_err_labels
+                self.y_err_labels,
+                expected_sys_errs=frozenset(systematic_err_labels),
             )
 
         self.statistical_err = np.zeros(
@@ -313,9 +324,9 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
     def __init__(
         self,
         *args,
-        statistical_err_labels=None,
+        statistical_err_labels=[],
         statistical_err_treatment="independent",
-        systematic_err_labels=None,
+        systematic_err_labels=[],
         systematic_err_treatment="independent",
     ):
         """
@@ -323,10 +334,10 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
 
         Args:
             *args: Variable length argument list for the base class.
-            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to ["DATA-ERR"].
+            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to [].
             statistical_err_treatment (str, optional): Method to treat statistical errors.
                 Options are "independent" or "difference". Defaults to "independent".
-            systematic_err_labels (list of str, optional): Labels for systematic errors. Defaults to ["ERR-SYS"].
+            systematic_err_labels (list of str, optional): Labels for systematic errors. Defaults to [].
             systematic_err_treatment (str, optional): Method to treat systematic errors.
                 Options are "independent" or "difference". Defaults to "independent".
 
@@ -339,15 +350,17 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
             *args,
             statistical_err_labels=statistical_err_labels,
             statistical_err_treatment=statistical_err_treatment,
+            systematic_err_labels=systematic_err_labels,
         )
 
-        if systematic_err_labels is None:
+        if not systematic_err_labels:
             systematic_err_labels, systematic_err_treatment = extract_syserr_labels(
-                self.y_err_labels
+                self.y_err_labels, expected_stat_errs=frozenset(statistical_err_labels)
             )
 
         self.systematic_offset_err = []
         self.systematic_norm_err = []
+        self.general_systematic_err = []
 
         for i, label in enumerate(systematic_err_labels):
             if label not in self.y_err_labels:
@@ -363,18 +376,21 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
                 elif np.allclose(err, err[0]):
                     self.systematic_offset_err.append(err[0])
                 else:
-                    raise ValueError(
-                        "Systematic error must be either a constant ratio or a constant factor across all angles."
-                    )
+                    self.general_systematic_err.append(err)
 
+        self.general_systematic_err = np.array(self.general_systematic_err)
         self.systematic_norm_err = np.array(self.systematic_norm_err)
         self.systematic_offset_err = np.array(self.systematic_offset_err)
+
         if systematic_err_treatment == "independent":
             self.systematic_offset_err = np.sqrt(
                 np.sum(self.systematic_offset_err**2, axis=0)
             )
             self.systematic_norm_err = np.sqrt(
                 np.sum(self.systematic_norm_err**2, axis=0)
+            )
+            self.general_systematic_err = np.sqrt(
+                np.sum(self.general_systematic_err**2, axis=0)
             )
         else:
             raise ValueError(
