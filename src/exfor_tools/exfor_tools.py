@@ -218,6 +218,8 @@ def extract_syserr_labels(
     """
     allowed_sys_err_combos = frozenset([frozenset(l) for l in allowed_sys_errs])
     sys_err_labels = frozenset(labels) - allowed_stat_errs
+    if len(sys_err_labels) == 0:
+        return [], "independent"
     if sys_err_labels in allowed_sys_err_combos:
         return list(sys_err_labels), "independent"
     else:
@@ -248,6 +250,8 @@ def extract_staterr_labels(
         + [frozenset([l]) for l in allowed_stat_errs]
     )
     stat_err_labels = frozenset(labels) - allowed_sys_errs
+    if len(stat_err_labels) == 0:
+        return [], "independent"
     if stat_err_labels in allowed_stat_err_combos:
         return list(stat_err_labels), "independent"
     else:
