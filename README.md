@@ -24,7 +24,7 @@ bash update_database.sh </path/to/exfor-XXXX.zip> --db-dir </path/where/db/shoul
 This will extract and process the data to `</path/where/db/should/go/unpack_exfor-YYYY/X4-YYYY-12-31>`, setting the environment variable `$X43I_DATAPATH` accordingly. `x4i3` uses this environment variable to find the database on `import`, so you should add this to your environment setup. If you use bash, this will look something like this:
 
 ```sh
-echo $X43I_DATAPATH >> ~/.bashrc
+echo export X43I_DATAPATH=$X43I_DATAPATH >> ~/.bashrc
 ```
 
 This functionality for modifying the database used by `x4i3` is provided in [x4i3_tools](https://github.com/afedynitch/x4i3_tools), which is included as a submodule.
