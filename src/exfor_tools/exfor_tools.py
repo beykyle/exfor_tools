@@ -563,7 +563,7 @@ def parse_differential_data(
                     f"Expected only one {label} column, found {len(iyerr)}"
                 )
 
-            err = err_parser.getColumn(iyerr, data_set)
+            err = err_parser.getColumn(iyerr[0], data_set)
             err_units = err[1]
             err_data = np.array(sanitize_column(err[2:]), dtype=np.float64)
             # convert to same units as data
