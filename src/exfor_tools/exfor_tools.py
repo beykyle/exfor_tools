@@ -194,7 +194,8 @@ def extract_syserr_labels(
     allowed_stat_errs (set): A set of allowed statistical error labels.
 
     Returns:
-    tuple: A tuple containing the systematic error labels and a string specifying the treatment
+    tuple: A tuple containing the systematic error labels and a string specifying
+    the treatment
 
     Raises:
     ValueError: If the statistical error labels are ambiguous
@@ -261,9 +262,9 @@ class AngularDistributionStatErr(AngularDistribution):
     def __init__(
         self,
         *args,
-        statistical_err_labels=[],
+        statistical_err_labels=None,
         statistical_err_treatment="independent",
-        systematic_err_labels=[],
+        systematic_err_labels=None,
     ):
         """
         Initialize an AngularDistributionStatErr instance.
@@ -281,10 +282,12 @@ class AngularDistributionStatErr(AngularDistribution):
             or if an unknown statistical_err_treatment is provided.
         """
         super().__init__(*args)
-        if not statistical_err_labels:
+        if statistical_err_labels is None:
             statistical_err_labels, statistical_err_treatment = extract_staterr_labels(
                 self.y_err_labels,
-                expected_sys_errs=frozenset(systematic_err_labels),
+                expected_sys_errs=frozenset(
+                    systematic_err_labels if systematic_err_labels is not None else []
+                ),
             )
 
         self.statistical_err = np.zeros(
@@ -324,9 +327,9 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
     def __init__(
         self,
         *args,
-        statistical_err_labels=[],
+        statistical_err_labels=None,
         statistical_err_treatment="independent",
-        systematic_err_labels=[],
+        systematic_err_labels=None,
         systematic_err_treatment="independent",
     ):
         """
@@ -353,9 +356,12 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
             systematic_err_labels=systematic_err_labels,
         )
 
-        if not systematic_err_labels:
+        if systematic_err_labels is None:
             systematic_err_labels, systematic_err_treatment = extract_syserr_labels(
-                self.y_err_labels, expected_stat_errs=frozenset(statistical_err_labels)
+                self.y_err_labels,
+                expected_stat_errs=frozenset(
+                    statistical_err_labels if statistical_err_labels is not None else []
+                ),
             )
 
         self.systematic_offset_err = []
