@@ -1093,6 +1093,9 @@ class ExforEntryAngularDistribution:
                 parsing_kwargs=parsing_kwargs,
             )
             for m in measurements:
+                if "min_num_pts" in filter_kwargs:
+                    if m.x.size < filter_kwargs["min_num_pts"]:
+                        continue
                 self.measurements.append(m)
             for subentry, e in failed_parses.items():
                 self.failed_parses[key[0]] = (subentry, e)

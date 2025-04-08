@@ -13,7 +13,6 @@ from .exfor_tools import (
     parse_ex_energy,
     parse_differential_data,
     parse_angular_distribution,
-    __EXFOR_DB__,
 )
 
 init_exfor_db()
