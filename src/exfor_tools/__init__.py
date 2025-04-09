@@ -14,6 +14,7 @@ from .exfor_tools import (
     parse_differential_data,
     parse_angular_distribution,
 )
+from . import query_elastic
 
 init_exfor_db()
 from .__version__ import __version__
