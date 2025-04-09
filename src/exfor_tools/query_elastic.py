@@ -125,4 +125,5 @@ def query_elastic_data(target, energy_range, min_num_pts, vocal=False):
         (entries_nn, failed_parses_nn),
     )
 
+
 # TODO make class for all this data, make it picklable, add write function that takes in output dir
