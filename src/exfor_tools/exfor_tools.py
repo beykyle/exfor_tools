@@ -1265,7 +1265,15 @@ def plot_angular_distributions(
             x_err = np.copy(measurement.x_err)
             y = np.copy(measurement.y)
             y_err = np.copy(measurement.y_err)
-            color = plot_errorbar(ax, x, x_err, y, y_err, offset, log)
+            color = plot_errorbar(
+                ax,
+                np.copy(measurement.x),
+                np.copy(measurement.x_err),
+                np.copy(measurement.y),
+                np.copy(measurement.y_err),
+                offset,
+                log,
+            )
             c.append(color)
 
         if draw_baseline:
