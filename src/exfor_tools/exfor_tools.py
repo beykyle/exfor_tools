@@ -40,12 +40,12 @@ def init_exfor_db():
 
 
 # these are the supported quantities at the moment
-# XS = cross section, A = angle, Ruth = Rutherford cross section, Ay = analyzing power
 quantity_matches = {
     "dXS/dA": [["DA"]],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
     "Ay": [["POL/DA", "ANA"]],
 }
+quantities = list(quantity_matches.keys())
 
 quantity_symbols = {
     ("DA",): r"$\frac{d\sigma}{d\Omega}$",
@@ -952,6 +952,9 @@ class ExforEntryAngularDistribution:
         filter_kwargs={},
     ):
         r""" """
+        if "min_num_pts" not in filter_kwargs:
+            filter_kwargs["min_num_pts"] = 4
+
         self.vocal = vocal
         self.entry = entry
         entry_datasets = __EXFOR_DB__.retrieve(ENTRY=entry)[entry].getDataSets()
@@ -1093,9 +1096,8 @@ class ExforEntryAngularDistribution:
                 parsing_kwargs=parsing_kwargs,
             )
             for m in measurements:
-                if "min_num_pts" in filter_kwargs:
-                    if m.x.size < filter_kwargs["min_num_pts"]:
-                        continue
+                if m.x.size < filter_kwargs["min_num_pts"]:
+                    continue
                 self.measurements.append(m)
             for subentry, e in failed_parses.items():
                 self.failed_parses[key[0]] = (subentry, e)
@@ -1151,12 +1153,18 @@ def set_label(
     # TODO when there is more than one measurement, make each subentry label correspond to its
     # corresponding color: https://matplotlib.org/1.5.0/examples/text_labels_and_annotations/rainbow_text.html
     if label_xloc_deg is None:
-        if x[0] > 20 and x[-1] > 150:
-            label_xloc_deg = -18
-        if x[0] > 30 and x[-1] > 150:
+        if x[-1] < 60:
+            label_xloc_deg = 65
+        elif x[-1] < 90:
+            label_xloc_deg = 95
+        elif x[-1] < 120:
+            label_xloc_deg = 125
+        elif x[0] > 30 and x[-1] > 150:
             label_xloc_deg = 1
-        elif x[-1] < 140:
-            label_xloc_deg = 145
+        elif x[0] > 20 and x[-1] > 150:
+            label_xloc_deg = -18
+        elif x[-1] < 150:
+            label_xloc_deg = 155
         else:
             label_xloc_deg = 175
 

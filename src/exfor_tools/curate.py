@@ -10,30 +10,54 @@ from .exfor_tools import (
     query_for_entries,
     plot_angular_distributions,
     categorize_measurements_by_energy,
+    get_symbol,
 )
 
 
-class DifferentialData:
+class ReactionAngularData:
+    r"""
+    Collects all entries for angular data (SDX, Ay, etc) for a given reaction
+    over a range of energies
+    """
+
     def __init__(
-        self, target, projectile, quantity, energy_range, min_num_pts, vocal=False
+        self,
+        target,
+        projectile,
+        quantity,
+        **kwargs,
     ):
         self.target = target
         self.projectile = projectile
         self.quantity = quantity
-        self.energy_range = energy_range
-        self.min_num_pts = min_num_pts
-        self.vocal = vocal
+        self.settings = kwargs
+        self.residual = kwargs.get("residual", self.target)
+        self.product = kwargs.get("product", self.projectile)
+        self.special_rxn_type = kwargs.get("special_rxn_type", "")
+        self.vocal = kwargs.get("vocal", False)
 
-        self.entries, self.failed_parses = self.query()
+        self.symbol_target = get_symbol(*self.target)
+        self.symbol_residual = get_symbol(*self.residual)
+        self.symbol_projectile = get_symbol(*self.projectile)
+        self.symbol_product = get_symbol(*self.product)
 
-    def query(self):
+        if self.residual == self.target:
+            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},{self.symbol_product})_{{{self.special_rxn_type}}}$"
+        else:
+            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},{self.symbol_product})_{{{self.special_rxn_type}}}${self.symbol_residual}"
+
+        self.entries, self.failed_parses = self.query(**kwargs)
+
+    def query(self, **kwargs):
+        if self.vocal:
+            print("\n========================================================")
+            print(f"Now parsing {self.quantity} for {self.rxn}")
+            print("\n========================================================")
         entries, failed_parses = query_for_entries(
             target=self.target,
             projectile=self.projectile,
             quantity=self.quantity,
-            Einc_range=self.energy_range,
-            vocal=self.vocal,
-            filter_kwargs={"filter_lab_angle": True, "min_num_pts": self.min_num_pts},
+            **kwargs,
         )
         if self.vocal:
             print("\n========================================================")
@@ -56,10 +80,8 @@ class DifferentialData:
             target=failed_parse.target,
             projectile=failed_parse.projectile,
             quantity=failed_parse.quantity,
-            Einc_range=self.energy_range,
-            vocal=self.vocal,
             parsing_kwargs=parsing_kwargs,
-            filter_kwargs={"filter_lab_angle": True, "min_num_pts": self.min_num_pts},
+            **self.settings,
         )
         if len(new_entry.failed_parses) == 0 and len(new_entry.measurements) > 0:
             self.entries[entry] = new_entry
@@ -108,77 +130,8 @@ class DifferentialData:
         return axes
 
 
-class TargetData:
-    r"""
-    Queries EXFOR for all of the (n,n) and (p,p) (both absolute and ratio to Rutherford)
-    subentries for a given target, within energy_range and including at least min_num_pts
-    angular points, storing them as a dictionary from entry ID to ExforEntryAngularDistribution
-    """
-
-    # TODO add analyzing powers
-    def __init__(self, target, energy_range, min_num_pts, vocal=False):
-        self.target = target
-        self.energy_range = energy_range
-        self.min_num_pts = min_num_pts
-        self.vocal = vocal
-
-        A, Z = target
-        # query and parse EXFOR
-        if self.vocal:
-            print("\n========================================================")
-            print(f"Parsing: {A}-{elements[Z]}(n,n)")
-            print("\n========================================================")
-
-        self.nn = DifferentialData(
-            self.target,
-            (1, 0),
-            "dXS/dA",
-            self.energy_range,
-            self.min_num_pts,
-            self.vocal,
-        )
-        if self.vocal:
-            print("\n========================================================")
-            print(f"Parsing: {A}-{elements[Z]}(p,p) (absolute)")
-            print("\n========================================================")
-        self.pp_abs = DifferentialData(
-            self.target,
-            (1, 1),
-            "dXS/dA",
-            self.energy_range,
-            self.min_num_pts,
-            self.vocal,
-        )
-        if self.vocal:
-            print("\n========================================================")
-            print(f"Parsing: {A}-{elements[Z]}(p,p) (ratio to Rutherford)")
-            print("\n========================================================")
-        self.pp_ratio = DifferentialData(
-            self.target,
-            (1, 1),
-            "dXS/dRuth",
-            self.energy_range,
-            self.min_num_pts,
-            self.vocal,
-        )
-
-        # remove (p,p) absolute data sets that are duplicate to (p,p) ratio data sets
-        remove_duplicates(*self.target, self.pp_ratio.entries, self.pp_abs.entries)
-        remove_duplicates(
-            *self.target, self.pp_ratio.failed_parses, self.pp_abs.failed_parses
-        )
-
-    def write(self, fpath: Path):
-        with open(fpath, "wb") as f:
-            pickle.dump(self, f)
-
-    @classmethod
-    def read(fpath: Path):
-        with open(fpath, "rb") as f:
-            return pickle.load(f)
-
-
-def cross_reference_entries(data_by_target: list[TargetData]):
+def cross_reference_entries(data_by_target: list):
+    # TODO make this a member function of DataCorpus
     entries = {}
     for target, data in data_by_target.items():
         for k, v in data.nn.entries.items():
