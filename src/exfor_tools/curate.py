@@ -1,9 +1,6 @@
-from pathlib import Path
-import pickle
 import numpy as np
 
 from matplotlib import pyplot as plt
-from periodictable import elements
 
 from .exfor_tools import (
     ExforEntryAngularDistribution,
@@ -193,6 +190,9 @@ class AngularDataCorpus:
                                 quantities["dXS/dA"].failed_parses,
                             )
 
+        self.data_by_entry = self.cross_reference_entries()
+        self.num_data_pts, self.num_measurements = self.number_of_data_pts()
+
     def to_json(self):
         # TODO
         pass
@@ -210,6 +210,25 @@ class AngularDataCorpus:
                             entries[k] = [v]
 
         return entries
+
+    def number_of_data_pts(self):
+        """return a nested dict of the same structure as self.data but with the total number of of data points instead"""
+        n_data_pts = {}
+        n_measurements = {}
+        for target in self.data.keys():
+            n_data_pts[target] = {}
+            n_measurements[target] = {}
+            for projectile in self.data[target].keys():
+                n_data_pts[target][projectile] = {}
+                n_measurements[target][projectile] = {}
+                for quantity, data in self.data[target][projectile].items():
+                    n_measurements[target][projectile][quantity] = np.sum(
+                        [len(entry.measurements) for entry_id, entry in data.entries.items()]
+                    )
+                    n_data_pts[target][projectile][quantity] = np.sum(
+                        [np.sum([m.rows for m in entry.measurements]) for entry_id, entry in data.entries.items()]
+                    )
+        return n_data_pts, n_measurements
 
 
 def remove_duplicates(A, Z, entries_ppr, entries_pp, vocal=False):
