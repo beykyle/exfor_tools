@@ -42,9 +42,11 @@ class ReactionAngularData:
         self.symbol_product = get_symbol(*self.product)
 
         if self.residual == self.target:
-            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},{self.symbol_product})_{{{self.special_rxn_type}}}$"
+            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},"
+            f"{self.symbol_product})_{{{self.special_rxn_type}}}$"
         else:
-            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},{self.symbol_product})_{{{self.special_rxn_type}}}${self.symbol_residual}"
+            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},"
+            f"{self.symbol_product})_{{{self.special_rxn_type}}}${self.symbol_residual}"
 
         self.entries, self.failed_parses = self.query(**kwargs)
 
@@ -130,28 +132,84 @@ class ReactionAngularData:
         return axes
 
 
-def cross_reference_entries(data_by_target: list):
-    # TODO make this a member function of DataCorpus
-    entries = {}
-    for target, data in data_by_target.items():
-        for k, v in data.nn.entries.items():
-            if k in entries:
-                entries[k].append(v)
-            else:
-                entries[k] = [v]
+class AngularDataCorpus:
+    r"""Queries, parses and stores differential cross sections and
+    analyzing powers for multiple reactions from EXFOR, storing them
+    as nested dicts from target -> projectile -> quantity
+    """
 
-        for k, v in data.pp_ratio.entries.items():
-            if k in entries:
-                entries[k].append(v)
-            else:
-                entries[k] = [v]
+    def __init__(
+        self,
+        targets: list[tuple],
+        projectiles: list[tuple],
+        quantities: list[str],
+        settings: list[dict],
+        vocal=False,
+    ):
+        self.targets = targets
+        self.projectiles = projectiles
+        self.quantities = quantities
+        self.settings = settings
+        self.vocal = vocal
+        self.data = {}
 
-        for k, v in data.pp_abs.entries.items():
-            if k in entries:
-                entries[k].append(v)
+        for target, projectile, quantity, kwargs in zip(
+            targets, projectiles, quantities, settings
+        ):
+            kwargs["vocal"] = vocal
+            entries = ReactionAngularData(
+                target,
+                projectile,
+                quantity,
+                **kwargs,
+            )
+
+            if target in self.data:
+                if projectile in self.data[target]:
+                    self.data[target][projectile][quantity] = entries
+                else:
+                    self.data[target][projectile] = {quantity: entries}
             else:
-                entries[k] = [v]
-    return entries
+                self.data[target] = {projectile: {quantity: entries}}
+
+        # handle duplicates between absolute angular cross sections and ratio to Rutherford
+        for target in self.data.keys():
+            for projectile in self.data[target].keys():
+                if projectile[1] > 0:
+                    quantities = self.data[target][projectile]
+                    if "dXS/dA" in quantities and "dXS/dRuth" in quantities:
+                        if (
+                            quantities["dXS/dA"].settings
+                            == quantities["dXS/dRuth"].settings
+                        ):
+                            remove_duplicates(
+                                *target,
+                                quantities["dXS/dRuth"].entries,
+                                quantities["dXS/dA"].entries,
+                            )
+                            remove_duplicates(
+                                *target,
+                                quantities["dXS/dRuth"].failed_parses,
+                                quantities["dXS/dA"].failed_parses,
+                            )
+
+    def to_json(self):
+        # TODO
+        pass
+
+    def cross_reference_entries(self):
+        r"""Builds a dictionary from entry ID to ExforEntryAngularDistribution from all of self.data"""
+        entries = {}
+        for target in self.data.keys():
+            for projectile in self.data[target].keys():
+                for quantity, data in self.data[target][projectile].items():
+                    for k, v in data.entries.items():
+                        if k in entries:
+                            entries[k].append(v)
+                        else:
+                            entries[k] = [v]
+
+        return entries
 
 
 def remove_duplicates(A, Z, entries_ppr, entries_pp, vocal=False):
