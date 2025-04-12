@@ -31,7 +31,7 @@ This functionality for modifying the database used by `x4i3` is provided in [x4i
 
 ## examples and tutorials
 
-Check out [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/data_curation_tutorial.ipynb)
+Check out [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/dataset_curation_tutorial.ipynb)
 
 This demonstrates how to query for and parse exfor entries, and curate and plot a data set, producing this figure: 
 
