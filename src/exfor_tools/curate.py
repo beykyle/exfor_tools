@@ -223,10 +223,16 @@ class AngularDataCorpus:
                 n_measurements[target][projectile] = {}
                 for quantity, data in self.data[target][projectile].items():
                     n_measurements[target][projectile][quantity] = np.sum(
-                        [len(entry.measurements) for entry_id, entry in data.entries.items()]
+                        [
+                            len(entry.measurements)
+                            for entry_id, entry in data.entries.items()
+                        ]
                     )
                     n_data_pts[target][projectile][quantity] = np.sum(
-                        [np.sum([m.rows for m in entry.measurements]) for entry_id, entry in data.entries.items()]
+                        [
+                            np.sum([m.rows for m in entry.measurements])
+                            for entry_id, entry in data.entries.items()
+                        ]
                     )
         return n_data_pts, n_measurements
 
