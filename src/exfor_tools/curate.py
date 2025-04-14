@@ -29,7 +29,7 @@ def query_for_entries(reaction: Reaction, quantity: str, **kwargs):
         target=reaction.exfor_symbol_target,
         projectile=reaction.exfor_symbol_projectile,
         # TODO handle case of reacxtion = "projectile,EL"
-        #reaction=f"{reaction.exfor_symbol_projectile},{reaction.exfor_symbol_product}",
+        # reaction=f"{reaction.exfor_symbol_projectile},{reaction.exfor_symbol_product}",
     ).keys()
 
     successfully_parsed_entries = {}
