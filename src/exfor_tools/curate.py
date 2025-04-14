@@ -2,48 +2,148 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 
+from .db import __EXFOR_DB__
 from .exfor_tools import (
-    ExforEntryAngularDistribution,
-    query_for_entries,
+    ExforEntry,
     plot_angular_distributions,
-    categorize_measurements_by_energy,
-    get_symbol,
+    Reaction,
+    quantity_matches,
 )
 
 
-class ReactionAngularData:
+def query_for_entries(reaction: Reaction, quantity: str, **kwargs):
+    """
+    Query for entries in the EXFOR database based on projectile, target,
+    and quantity.
+
+    reaction: the reaction to query
+    quantity: The quantity to query.
+    kwargs: Additional keyword arguments for entry parsing.
+
+    Returns: A tuple containing successfully parsed entries and failed entries.
+    """
+
+    exfor_quantity = quantity_matches[quantity][0][0]
+    entries = __EXFOR_DB__.query(
+        quantity=exfor_quantity,
+        target=reaction.exfor_symbol_target,
+        projectile=reaction.exfor_symbol_projectile,
+        # TODO handle case of reacxtion = "projectile,EL"
+        #reaction=f"{reaction.exfor_symbol_projectile},{reaction.exfor_symbol_product}",
+    ).keys()
+
+    successfully_parsed_entries = {}
+    failed_entries = {}
+
+    for entry in entries:
+        parsed_entry = ExforEntry(
+            entry,
+            reaction,
+            quantity,
+            **kwargs,
+        )
+        if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
+            successfully_parsed_entries[entry] = parsed_entry
+        elif len(parsed_entry.failed_parses) > 0:
+            failed_entries[entry] = parsed_entry
+
+    return successfully_parsed_entries, failed_entries
+
+
+def find_unique_elements_with_tolerance(arr, tolerance):
+    """
+    Identify unique elements in an array within a specified tolerance.
+
+    Parameters:
+    arr (list or array-like): The input array to process.
+    tolerance (float): The tolerance within which elements are considered
+        identical.
+
+    Returns:
+    unique_elements (list):
+    idx_sets (list): a list of sets, each entry corresponding to the indices
+        to array that are within tolerance of the corresponding entry in
+        unique_elements
+    """
+    unique_elements = []
+    idx_sets = []
+
+    for idx, value in enumerate(arr):
+        found = False
+        for i, unique_value in enumerate(unique_elements):
+            if abs(value - unique_value) <= tolerance:
+                idx_sets[i].add(idx)
+                found = True
+                break
+
+        if not found:
+            unique_elements.append(value)
+            idx_sets.append({idx})
+
+    return unique_elements, idx_sets
+
+
+def categorize_measurement_list(measurements, min_num_pts=5, Einc_tol=0.1):
+    """
+    Categorize a list of measurements by unique incident energy.
+
+    Parameters:
+    measurements (list): A list of `AngularDistribution`s
+    min_num_pts (int, optional): Minimum number of points for a valid
+        measurement group. Default is 5.
+    Einc_tol (float, optional): Tolerance for considering energies
+        as identical. Default is 0.1.
+
+    Returns:
+    sorted_measurements (list): A list of lists, where each sublist contains
+        measurements with similar incident energy.
+    """
+    energies = np.array([m.Einc for m in measurements])
+    unique_energies, idx_sets = find_unique_elements_with_tolerance(energies, Einc_tol)
+    unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets)))
+
+    sorted_measurements = []
+    for idx_set in idx_sets:
+        group = [measurements[idx] for idx in idx_set]
+        sorted_measurements.append(group)
+
+    return sorted_measurements
+
+
+def categorize_measurements_by_energy(all_entries, min_num_pts=5, Einc_tol=0.1):
     r"""
-    Collects all entries for angular data (SDX, Ay, etc) for a given reaction
-    over a range of energies
+    Given a dictionary form EXFOR entry number to ExforEntry, grabs all
+    and sorts them by energy, concatenating ones that are at the same energy
+    """
+    measurements = []
+    unique_subentries = set()
+    for entry, data in all_entries.items():
+        for measurement in data.measurements:
+            if measurement.subentry not in unique_subentries:
+                unique_subentries.add(measurement.subentry)
+                if measurement.x.shape[0] > min_num_pts:
+                    measurements.append(measurement)
+    return categorize_measurement_list(
+        measurements, min_num_pts=min_num_pts, Einc_tol=Einc_tol
+    )
+
+
+class ReactionEntries:
+    r"""
+    Collects all entries for a given reaction and quantity over
+    a range of incident energies
     """
 
     def __init__(
         self,
-        target,
-        projectile,
-        quantity,
+        reaction: Reaction,
+        quantity: str,
         **kwargs,
     ):
-        self.target = target
-        self.projectile = projectile
+        self.reaction = reaction
         self.quantity = quantity
         self.settings = kwargs
-        self.residual = kwargs.get("residual", self.target)
-        self.product = kwargs.get("product", self.projectile)
-        self.special_rxn_type = kwargs.get("special_rxn_type", "")
         self.vocal = kwargs.get("vocal", False)
-
-        self.symbol_target = get_symbol(*self.target)
-        self.symbol_residual = get_symbol(*self.residual)
-        self.symbol_projectile = get_symbol(*self.projectile)
-        self.symbol_product = get_symbol(*self.product)
-
-        if self.residual == self.target:
-            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},"
-            f"{self.symbol_product})_{{{self.special_rxn_type}}}$"
-        else:
-            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},"
-            f"{self.symbol_product})_{{{self.special_rxn_type}}}${self.symbol_residual}"
 
         self.entries, self.failed_parses = self.query(**kwargs)
 
@@ -53,8 +153,8 @@ class ReactionAngularData:
             print(f"Now parsing {self.quantity} for {self.rxn}")
             print("\n========================================================")
         entries, failed_parses = query_for_entries(
-            target=self.target,
-            projectile=self.projectile,
+            target=self.reaction.target,
+            projectile=self.reaction.projectile,
             quantity=self.quantity,
             **kwargs,
         )
@@ -74,7 +174,7 @@ class ReactionAngularData:
         from self.failed_parses
         """
         failed_parse = self.failed_parses[entry]
-        new_entry = ExforEntryAngularDistribution(
+        new_entry = ExforEntry(
             entry=failed_parse.entry,
             target=failed_parse.target,
             projectile=failed_parse.projectile,
@@ -122,73 +222,48 @@ class ReactionAngularData:
                 measurements_categorized[idx0:idxf],
                 axes[i],
                 data_symbol=list(self.entries.values())[0].data_symbol,
-                rxn_label=list(self.entries.values())[0].rxn,
+                rxn_label=list(self.entries.values())[0].reaction.pretty_string,
                 label_kwargs=label_kwargs,
                 **plot_kwargs,
             )
         return axes
 
 
-class AngularDataCorpus:
-    r"""Queries, parses and stores differential cross sections and
-    analyzing powers for multiple reactions from EXFOR, storing them
-    as nested dicts from target -> projectile -> quantity
+def get_multiple_quantities(
+    reactions: list[Reaction],
+    quantities: list[str],
+    settings: dict,
+    vocal=False,
+):
+    data = []
+    for quantity in quantities:
+        data.append(ReactionQuantityData())
+
+
+class ReactionQuantityData:
+    r"""
+    Given a single quantity and a list of `Reaction`s, creates a corresponding
+    list of `ReactionEntries` objects holding all the ExforEntry objects for
+    that`Reaction` and the quantity of interest
     """
 
     def __init__(
         self,
-        targets: list[tuple],
-        projectiles: list[tuple],
-        quantities: list[str],
-        settings: list[dict],
+        reactions: list[Reaction],
+        quantity: list[str],
+        settings: dict,
         vocal=False,
     ):
-        self.targets = targets
-        self.projectiles = projectiles
-        self.quantities = quantities
         self.settings = settings
         self.vocal = vocal
         self.data = {}
 
-        for target, projectile, quantity, kwargs in zip(
-            targets, projectiles, quantities, settings
-        ):
-            kwargs["vocal"] = vocal
-            entries = ReactionAngularData(
-                target,
-                projectile,
-                quantity,
-                **kwargs,
+        for reaction in reactions:
+            self.data[reaction] = ReactionEntries(
+                reaction,
+                self.quantity,
+                **settings,
             )
-
-            if target in self.data:
-                if projectile in self.data[target]:
-                    self.data[target][projectile][quantity] = entries
-                else:
-                    self.data[target][projectile] = {quantity: entries}
-            else:
-                self.data[target] = {projectile: {quantity: entries}}
-
-        # handle duplicates between absolute angular cross sections and ratio to Rutherford
-        for target in self.data.keys():
-            for projectile in self.data[target].keys():
-                if projectile[1] > 0:
-                    quantities = self.data[target][projectile]
-                    if "dXS/dA" in quantities and "dXS/dRuth" in quantities:
-                        if (
-                            quantities["dXS/dA"].settings
-                            == quantities["dXS/dRuth"].settings
-                        ):
-                            remove_duplicates(
-                                *target,
-                                quantities["dXS/dRuth"].entries,
-                                quantities["dXS/dA"].entries,
-                            )
-                            remove_duplicates(
-                                *target,
-                                quantities["dXS/dRuth"].failed_parses,
-                                quantities["dXS/dA"].failed_parses,
-                            )
 
         self.data_by_entry = self.cross_reference_entries()
         self.num_data_pts, self.num_measurements = self.number_of_data_pts()
@@ -198,42 +273,32 @@ class AngularDataCorpus:
         pass
 
     def cross_reference_entries(self):
-        r"""Builds a dictionary from entry ID to ExforEntryAngularDistribution from all of self.data"""
+        r"""Builds a dictionary from entry ID to ExforEntry from all of self.data"""
         entries = {}
-        for target in self.data.keys():
-            for projectile in self.data[target].keys():
-                for quantity, data in self.data[target][projectile].items():
-                    for k, v in data.entries.items():
-                        if k in entries:
-                            entries[k].append(v)
-                        else:
-                            entries[k] = [v]
-
+        for reaction, entries in self.data.items():
+            for k, v in entries.entries.items():
+                if k in entries:
+                    entries[k].append(v)
+                else:
+                    entries[k] = [v]
         return entries
 
     def number_of_data_pts(self):
-        """return a nested dict of the same structure as self.data but with the total number of of data points instead"""
+        """return a nested dict of the same structure as self.data but
+        with the total number of of data points instead"""
         n_data_pts = {}
         n_measurements = {}
-        for target in self.data.keys():
-            n_data_pts[target] = {}
-            n_measurements[target] = {}
-            for projectile in self.data[target].keys():
-                n_data_pts[target][projectile] = {}
-                n_measurements[target][projectile] = {}
-                for quantity, data in self.data[target][projectile].items():
-                    n_measurements[target][projectile][quantity] = np.sum(
-                        [
-                            len(entry.measurements)
-                            for entry_id, entry in data.entries.items()
-                        ]
-                    )
-                    n_data_pts[target][projectile][quantity] = np.sum(
-                        [
-                            np.sum([m.rows for m in entry.measurements])
-                            for entry_id, entry in data.entries.items()
-                        ]
-                    )
+        for reaction, entries in self.data.items():
+            n_measurements[reaction] = np.sum(
+                [len(entry.measurements) for entry_id, entry in entries.entries.items()]
+            )
+            n_data_pts[reaction] = np.sum(
+                [
+                    np.sum([m.rows for m in entry.measurements])
+                    for entry_id, entry in entries.entries.items()
+                ]
+            )
+
         return n_data_pts, n_measurements
 
 

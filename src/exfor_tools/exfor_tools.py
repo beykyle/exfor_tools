@@ -3,7 +3,6 @@ import periodictable
 from functools import reduce
 import jitr.utils.mass as mass
 
-from x4i3 import exfor_manager
 from x4i3.exfor_reactions import X4Reaction
 from x4i3.exfor_column_parsing import (
     X4ColumnParser,
@@ -25,18 +24,7 @@ from x4i3.exfor_column_parsing import (
     X4MissingErrorColumnPair,
 )
 
-__EXFOR_DB__ = None
-
-
-def init_exfor_db():
-    """
-    Initialize the EXFOR database.
-
-    This function sets up the global EXFOR database manager if it has not been initialized yet.
-    """
-    global __EXFOR_DB__
-    if __EXFOR_DB__ is None:
-        __EXFOR_DB__ = exfor_manager.X4DBManagerDefault()
+from .db import __EXFOR_DB__
 
 
 # these are the supported quantities at the moment
@@ -114,10 +102,15 @@ energyExParserList = [
 ]
 
 
+class EnergyDistribution:
+    pass  # TODO
+
+
 class AngularDistribution:
     """
-    Stores angular distribution with x and y errors for a given incident and residual
-    excitation energy. Allows for multiple y_errs with different labels.
+    Stores angular distribution with x and y errors for a given incident and
+    residual excitation energy. Allows for multiple y_errs with different
+    labels.
 
     Attributes:
         subentry (str): Subentry identifier.
@@ -233,7 +226,8 @@ def extract_staterr_labels(
     allowed_stat_errs (set): A set of allowed statistical error labels.
 
     Returns:
-    tuple: A tuple containing the statistical error labels and a string specifying the treatment
+    tuple: A tuple containing the statistical error labels and a string specifying
+    the treatment
 
     Raises:
     ValueError: If the statistical error labels are ambiguous
@@ -271,15 +265,20 @@ class AngularDistributionStatErr(AngularDistribution):
 
         Args:
             *args: Variable length argument list for the base class.
-            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to [].
-            statistical_err_treatment (str, optional): Method to treat statistical errors.
-                Options are "independent" or "difference". Defaults to "independent".
-            statistical_err_labels (list of str, optional): Labels for systematic errors. Defaults to []. Only
-                relevant if statistical_err_labels is empty, meaning automatic parsing will be attempted.
+            statistical_err_labels (list of str, optional): Labels for
+                statistical errors. Defaults to [].
+            statistical_err_treatment (str, optional): Method to treat
+                statistical errors. Options are "independent" or "difference".
+                Defaults to "independent".
+            statistical_err_labels (list of str, optional): Labels for
+                systematic errors. Defaults to []. Only relevant if
+                statistical_err_labels is empty, meaning automatic parsing
+                will be attempted.
 
         Raises:
-            ValueError: If a column label in statistical_err_labels is not found in the subentry
-            or if an unknown statistical_err_treatment is provided.
+            ValueError: If a column label in statistical_err_labels is not
+            found in the subentry or if an unknown statistical_err_treatment
+            is provided.
         """
         super().__init__(*args)
         if statistical_err_labels is None:
@@ -317,8 +316,8 @@ class AngularDistributionStatErr(AngularDistribution):
 
 class AngularDistributionSysStatErr(AngularDistributionStatErr):
     """
-    AngularDistribution with a statistical uncertainty, and one or both of a systematic normalization or
-        offset uncertainty
+    AngularDistribution with a statistical uncertainty, and one or both
+    of a systematic normalization or offset uncertainty
 
     Attributes:
         systematic_err (np.ndarray): Total systematic error.
@@ -337,17 +336,22 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
 
         Args:
             *args: Variable length argument list for the base class.
-            statistical_err_labels (list of str, optional): Labels for statistical errors. Defaults to [].
-            statistical_err_treatment (str, optional): Method to treat statistical errors.
-                Options are "independent" or "difference". Defaults to "independent".
-            systematic_err_labels (list of str, optional): Labels for systematic errors. Defaults to [].
-            systematic_err_treatment (str, optional): Method to treat systematic errors.
-                Options are "independent" or "difference". Defaults to "independent".
+            statistical_err_labels (list of str, optional): Labels for
+                statistical errors. Defaults to [].
+            statistical_err_treatment (str, optional): Method to treat
+                statistical errors. Options are "independent" or "difference".
+                Defaults to "independent".
+            systematic_err_labels (list of str, optional): Labels for
+                systematic errors. Defaults to [].
+            systematic_err_treatment (str, optional): Method to treat
+                systematic errors. Options are "independent" or "difference".
+                Defaults to "independent".
 
         Raises:
-            ValueError: If a column label in systematic_err_labels is not found in the subentry
-            or if an unknown systematic_err_treatment is provided, or  the systematic error column
-            is non-uniform across angle.
+            ValueError: If a column label in systematic_err_labels is not
+                found in the subentry, or if an unknown
+                systematic_err_treatment is provided, or the systematic error
+                column is non-uniform across angle.
         """
         super().__init__(
             *args,
@@ -400,130 +404,9 @@ class AngularDistributionSysStatErr(AngularDistributionStatErr):
             )
         else:
             raise ValueError(
-                f"Unknown systematic_err_treatment option: {systematic_err_treatment}"
+                "Unknown systematic_err_treatment option:"
+                f" {systematic_err_treatment}"
             )
-
-
-def sanitize_column(col):
-    for i in range(len(col)):
-        if col[i] is None:
-            col[i] = 0
-    return col
-
-
-def query_for_entries(projectile, target, quantity, **kwargs):
-    """
-    Query for entries in the EXFOR database based on projectile, target, and quantity.
-
-    :param projectile: Tuple representing the projectile (A, Z).
-    :param target: Tuple representing the target (A, Z).
-    :param quantity: The quantity to query.
-    :param kwargs: Additional keyword arguments for entry parsing.
-    :return: A tuple containing successfully parsed entries and failed entries.
-    """
-    target_symbol = f"{str(periodictable.elements[target[1]])}-{target[0]}"
-
-    projectile_symbol = {
-        (1, 0): "N",
-        (1, 1): "P",
-        (2, 1): "D",
-        (3, 1): "T",
-        (4, 2): "A",
-    }.get(projectile, f"{str(periodictable.elements[projectile[1]])}-{projectile[0]}")
-
-    exfor_quantity = quantity_matches[quantity][0][0]
-    entries = __EXFOR_DB__.query(
-        quantity=exfor_quantity, target=target_symbol, projectile=projectile_symbol
-    ).keys()
-
-    successfully_parsed_entries = {}
-    failed_entries = {}
-
-    for entry in entries:
-        parsed_entry = ExforEntryAngularDistribution(
-            entry, target, projectile, quantity, **kwargs
-        )
-        if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
-            successfully_parsed_entries[entry] = parsed_entry
-        elif len(parsed_entry.failed_parses) > 0:
-            failed_entries[entry] = parsed_entry
-
-    return successfully_parsed_entries, failed_entries
-
-
-def find_unique_elements_with_tolerance(arr, tolerance):
-    """
-    Identify unique elements in an array within a specified tolerance.
-
-    Parameters:
-    arr (list or array-like): The input array to process.
-    tolerance (float): The tolerance within which elements are considered identical.
-
-    Returns:
-    unique_elements (list):
-    idx_sets (list): a list of sets, each entry corresponding to the indices to array
-        that arre within tolerance of the corresponding entry in unique_elements
-    """
-    unique_elements = []
-    idx_sets = []
-
-    for idx, value in enumerate(arr):
-        found = False
-        for i, unique_value in enumerate(unique_elements):
-            if abs(value - unique_value) <= tolerance:
-                idx_sets[i].add(idx)
-                found = True
-                break
-
-        if not found:
-            unique_elements.append(value)
-            idx_sets.append({idx})
-
-    return unique_elements, idx_sets
-
-
-def categorize_measurement_list(measurements, min_num_pts=5, Einc_tol=0.1):
-    """
-    Categorize a list of measurements by unique incident energy.
-
-    Parameters:
-    measurements (list): A list of `AngularDistribution`s
-    min_num_pts (int, optional): Minimum number of points for a valid
-        measurement group. Default is 5.
-    Einc_tol (float, optional): Tolerance for considering energies
-        as identical. Default is 0.1.
-
-    Returns:
-    sorted_measurements (list): A list of lists, where each sublist contains
-        measurements with similar incident energy.
-    """
-    energies = np.array([m.Einc for m in measurements])
-    unique_energies, idx_sets = find_unique_elements_with_tolerance(energies, Einc_tol)
-    unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets)))
-
-    sorted_measurements = []
-    for idx_set in idx_sets:
-        group = [measurements[idx] for idx in idx_set]
-        sorted_measurements.append(group)
-
-    return sorted_measurements
-
-
-def categorize_measurements_by_energy(all_entries, min_num_pts=5, Einc_tol=0.1):
-    r"""
-    Given a dictionary form EXFOR entry number to ExforEntryAngularDistribution, grabs all
-    the ExforEntryAngularDistributionSet's and sorts them by energy, concatenating ones
-    that are at the same energy
-    """
-    # TODO handle duplicate entries
-    measurements = []
-    for entry, data in all_entries.items():
-        for measurement in data.measurements:
-            if measurement.x.shape[0] > min_num_pts:
-                measurements.append(measurement)
-    return categorize_measurement_list(
-        measurements, min_num_pts=min_num_pts, Einc_tol=Einc_tol
-    )
 
 
 def parse_differential_data(
@@ -572,7 +455,7 @@ def parse_differential_data(
 
             err = err_parser.getColumn(iyerr[0], data_set)
             err_units = err[1]
-            err_data = np.array(sanitize_column(err[2:]), dtype=np.float64)
+            err_data = np.nan_to_num(np.array(err[2:], dtype=np.float64))
             # convert to same units as data
             if "PER-CENT" in err_units:
                 err_data *= xs / 100
@@ -885,6 +768,121 @@ def sort_subentry_data_by_energy(
     return measurements
 
 
+def get_exfor_particle_symbol(A, Z):
+    return {
+        (1, 0): "N",
+        (1, 1): "P",
+        (2, 1): "D",
+        (3, 1): "T",
+        (4, 2): "A",
+    }.get(
+        (A, Z),
+        f"{str(periodictable.elements[Z])}-{A}",
+    )
+
+
+class Reaction:
+    """Represents a simple A + a -> b + B reaction"""
+
+    # TODO generalize to multiple products or specific excited residual states
+    def __init__(self, target, projectile, residual=None, product=None, mass_kwargs={}):
+        if product is None:
+            product = projectile
+        if residual is None:
+            residual = target
+
+        self.target = target
+        self.projectile = projectile
+        self.product = product
+        self.residual = residual
+
+        Apre = self.target[0] + self.projectile[0]
+        Apost = self.residual[0] + self.product[0]
+        Zpre = self.target[1] + self.projectile[1]
+        Zpost = self.residual[1] + self.product[1]
+
+        self.mass_target = mass.mass(*self.target, **mass_kwargs)[0]
+        self.mass_projectile = mass.mass(*self.projectile, **mass_kwargs)[0]
+        self.mass_residual = mass.mass(*self.residual, **mass_kwargs)[0]
+        self.mass_product = mass.mass(*self.product, **mass_kwargs)[0]
+        self.Q = (
+            self.mass_projectile
+            + self.mass_target
+            - self.mass_residual
+            - self.mass_product
+        )
+
+        if Apre != Apost and Zpre != Zpost:
+            raise ValueError("Isospin not conserved in this reaction")
+
+        self.exfor_symbol_target = get_exfor_particle_symbol(*self.target)
+        self.exfor_symbol_residual = get_exfor_particle_symbol(*self.residual)
+        self.exfor_symbol_projectile = get_exfor_particle_symbol(*self.projectile)
+        self.exfor_symbol_product = get_exfor_particle_symbol(*self.product)
+
+        self.symbol_target = get_symbol(*self.target)
+        self.symbol_residual = get_symbol(*self.residual)
+        self.symbol_projectile = get_symbol(*self.projectile)
+        self.symbol_product = get_symbol(*self.product)
+
+        if self.residual == self.target:
+            self.pretty_string = (
+                f"{self.symbol_target}$({self.symbol_projectile},"
+                f"{self.symbol_product})$"
+            )
+        else:
+            self.pretty_string = (
+                f"{self.symbol_target}$({self.symbol_projectile},"
+                f"{self.symbol_product})${self.symbol_residual}"
+            )
+
+    def is_match(self, subentry):
+        target = (
+            subentry.reaction[0].targ.getA(),
+            subentry.reaction[0].targ.getZ(),
+        )
+        projectile = (
+            subentry.reaction[0].proj.getA(),
+            subentry.reaction[0].proj.getZ(),
+        )
+        product = subentry.reaction[0].products[0]
+        if product == "EL":
+            product = projectile
+        elif isinstance(product, str):
+            raise ValueError(f"Cannot parse product {product} of type {type(product)}")
+        else:
+            product = (
+                subentry.reaction[0].products[0].getA(),
+                subentry.reaction[0].products[0].getZ(),
+            )
+        if subentry.reaction[0].residual is None:
+            return False
+        else:
+            residual = (
+                subentry.reaction[0].residual.getA(),
+                subentry.reaction[0].residual.getZ(),
+            )
+        return (
+            target == self.target
+            and projectile == self.projectile
+            and product == self.product
+            and residual == self.residual
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, Reaction):
+            return False
+        return (self.target, self.projectile, self.product, self.residual) == (
+            other.target,
+            other.projectile,
+            other.product,
+            other.residual,
+        )
+
+    def __hash__(self):
+        return hash((self.target, self.projectile, self.product, self.residual))
+
+
 def get_symbol(A, Z, Ex=None):
     if (A, Z) == (1, 0):
         return "n"
@@ -931,22 +929,16 @@ def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4):
     return True
 
 
-class ExforEntryAngularDistribution:
-    r"""2-body reaction"""
+class ExforEntry:
 
     def __init__(
         self,
         entry: str,
-        target: tuple,
-        projectile: tuple,
+        reaction: Reaction,
         quantity: str,
-        residual: tuple = None,
-        product: tuple = None,
-        special_rxn_type="",
         Einc_range: tuple = None,
         Ex_range: tuple = None,
         vocal=False,
-        mass_kwargs={},
         MeasurementClass=AngularDistributionSysStatErr,
         parsing_kwargs={},
         filter_kwargs={},
@@ -959,69 +951,23 @@ class ExforEntryAngularDistribution:
         self.entry = entry
         entry_datasets = __EXFOR_DB__.retrieve(ENTRY=entry)[entry].getDataSets()
 
-        if product is None:
-            product = projectile
-        if residual is None:
-            residual = target
-
-        self.target = target
-        self.projectile = projectile
-        self.product = product
-        self.residual = residual
-
+        self.reaction = reaction
         if Einc_range is None:
             Einc_range = (0, np.inf)
         self.Einc_range = Einc_range
 
         elastic_only = False
-        product_match_key = self.product
         if (
             Ex_range is None
-            and self.product == self.projectile
-            and self.residual == self.target
+            and self.reaction.product == self.reaction.projectile
+            and self.reaction.residual == self.reaction.target
         ):
             Ex_range = (0, 0)
             elastic_only = True
-            product_match_key = "EL"
         elif Ex_range is None:
             Ex_range = (0, np.inf)
 
         self.Ex_range = Ex_range
-
-        if len(self.residual) == 3:
-            self.Ex_prime = self.residual[2]
-            ex_tol = 0.01
-            Ex_range = (self.Ex_prime - ex_tol, self.Ex_prime + ex_tol)
-
-        Apre = self.target[0] + self.projectile[0]
-        Apost = self.residual[0] + self.product[0]
-        Zpre = self.target[1] + self.projectile[1]
-        Zpost = self.residual[1] + self.product[1]
-
-        # TODO handle uncertainties cleanly
-        self.mass_target = mass.mass(*self.target, **mass_kwargs)[0]
-        self.mass_projectile = mass.mass(*self.projectile, **mass_kwargs)[0]
-        self.mass_residual = mass.mass(*self.residual, **mass_kwargs)[0]
-        self.mass_product = mass.mass(*self.product, **mass_kwargs)[0]
-        self.Q = (
-            self.mass_projectile
-            + self.mass_target
-            - self.mass_residual
-            - self.mass_product
-        )
-
-        if Apre != Apost and Zpre != Zpost:
-            raise ValueError("Isospin not conserved in this reaction")
-
-        self.symbol_target = get_symbol(*self.target)
-        self.symbol_residual = get_symbol(*self.residual)
-        self.symbol_projectile = get_symbol(*self.projectile)
-        self.symbol_product = get_symbol(*self.product)
-
-        if self.residual == self.target:
-            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},{self.symbol_product})_{{{special_rxn_type}}}$"
-        else:
-            self.rxn = f"{self.symbol_target}$({self.symbol_projectile},{self.symbol_product})_{{{special_rxn_type}}}${self.symbol_residual}"
 
         self.quantity = quantity
         self.exfor_quantities = quantity_matches[quantity]
@@ -1034,73 +980,46 @@ class ExforEntryAngularDistribution:
         for key, data_set in entry_datasets.items():
 
             if not isinstance(data_set.reaction[0], X4Reaction):
-                continue
-
-            target = (
-                data_set.reaction[0].targ.getA(),
-                data_set.reaction[0].targ.getZ(),
-            )
-            projectile = (
-                data_set.reaction[0].proj.getA(),
-                data_set.reaction[0].proj.getZ(),
-            )
-            if elastic_only:
-                product = data_set.reaction[0].products[0]
-            else:
-                product = (
-                    data_set.reaction[0].products[0].getA(),
-                    data_set.reaction[0].products[0].getZ(),
-                )
-            if data_set.reaction[0].residual is None:
-                continue
-            else:
-                residual = (
-                    data_set.reaction[0].residual.getA(),
-                    data_set.reaction[0].residual.getZ(),
+                raise ValueError(
+                    f"Could not parse reaction {data_set.reaction[0]}"
+                    " of type {type(data_set.reaction[0])}"
                 )
 
             quantity = data_set.reaction[0].quantity
-            if not (
-                target == self.target
-                and projectile == self.projectile
-                and product == product_match_key
-                and residual == self.residual
-            ):
-                continue
 
             if quantity[-1] == "EXP":
                 quantity = quantity[:-1]
 
             # matched reaction
-            if quantity not in self.exfor_quantities:
-                continue
+            if (
+                quantity in self.exfor_quantities
+                and filter_subentries(data_set, **filter_kwargs)
+                and self.reaction.is_match(data_set)
+            ):
 
-            if not filter_subentries(data_set, **filter_kwargs):
-                continue
-
-            # should be the same for every subentry
-            self.meta = {
-                "author": data_set.author,
-                "title": data_set.title,
-                "year": data_set.year,
-                "institute": data_set.institute,
-            }
-            measurements, failed_parses = attempt_parse_subentry(
-                key[1],
-                data_set,
-                Einc_range=self.Einc_range,
-                Ex_range=self.Ex_range,
-                elastic_only=elastic_only,
-                vocal=vocal,
-                MeasurementClass=MeasurementClass,
-                parsing_kwargs=parsing_kwargs,
-            )
-            for m in measurements:
-                if m.x.size < filter_kwargs["min_num_pts"]:
-                    continue
-                self.measurements.append(m)
-            for subentry, e in failed_parses.items():
-                self.failed_parses[key[0]] = (subentry, e)
+                # should be the same for every subentry
+                self.meta = {
+                    "author": data_set.author,
+                    "title": data_set.title,
+                    "year": data_set.year,
+                    "institute": data_set.institute,
+                }
+                measurements, failed_parses = attempt_parse_subentry(
+                    key[1],
+                    data_set,
+                    Einc_range=self.Einc_range,
+                    Ex_range=self.Ex_range,
+                    elastic_only=elastic_only,
+                    vocal=vocal,
+                    MeasurementClass=MeasurementClass,
+                    parsing_kwargs=parsing_kwargs,
+                )
+                for m in measurements:
+                    if m.x.size < filter_kwargs["min_num_pts"]:
+                        continue
+                    self.measurements.append(m)
+                for subentry, e in failed_parses.items():
+                    self.failed_parses[key[0]] = (subentry, e)
 
     def plot(
         self,
@@ -1122,7 +1041,7 @@ class ExforEntryAngularDistribution:
             ax,
             offsets,
             self.data_symbol,
-            self.rxn,
+            self.reaction.pretty_string,
             log,
             draw_baseline,
             baseline_offset,
