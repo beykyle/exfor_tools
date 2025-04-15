@@ -836,7 +836,7 @@ class Reaction:
                 f"{self.symbol_product})${self.symbol_residual}"
             )
 
-    def is_match(self, subentry):
+    def is_match(self, subentry, vocal=False):
         target = (
             subentry.reaction[0].targ.getA(),
             subentry.reaction[0].targ.getZ(),
@@ -849,7 +849,10 @@ class Reaction:
         if product == "EL":
             product = projectile
         elif isinstance(product, str):
-            raise ValueError(f"Cannot parse product {product} of type {type(product)}")
+            # TODO use inheritance in Reaction class to handle more general
+            # case in which there may be multiple or no residuals or products
+            return False  # not an A + a -> B + b reaction
+
         else:
             product = (
                 subentry.reaction[0].products[0].getA(),
@@ -980,10 +983,12 @@ class ExforEntry:
         for key, data_set in entry_datasets.items():
 
             if not isinstance(data_set.reaction[0], X4Reaction):
-                raise ValueError(
+                e = ValueError(
                     f"Could not parse reaction {data_set.reaction[0]}"
-                    " of type {type(data_set.reaction[0])}"
+                    f" of type {type(data_set.reaction[0])}"
                 )
+                self.failed_parses[key[0]] = (key[0], e)
+                continue
 
             quantity = data_set.reaction[0].quantity
 
@@ -994,7 +999,7 @@ class ExforEntry:
             if (
                 quantity in self.exfor_quantities
                 and filter_subentries(data_set, **filter_kwargs)
-                and self.reaction.is_match(data_set)
+                and self.reaction.is_match(data_set, self.vocal)
             ):
 
                 # should be the same for every subentry
@@ -1166,8 +1171,7 @@ def plot_angular_distributions(
     },
 ):
     r"""
-    Given measurements, a list where each entry is a tuple of ((E, E_err), AngularDistribution)
-    , plots them all on the same ax
+    Given a collection of measurements, plots them on the same axis with offsets
     """
     # if offsets is not a sequence, figure it out
     if isinstance(offsets, float) or isinstance(offsets, int) or offsets is None:
