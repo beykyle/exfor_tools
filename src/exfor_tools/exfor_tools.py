@@ -1174,6 +1174,7 @@ def plot_angular_distributions(
     Given a collection of measurements, plots them on the same axis with offsets
     """
     # if offsets is not a sequence, figure it out
+    # TODO do the same for label_offset_factor
     if isinstance(offsets, float) or isinstance(offsets, int) or offsets is None:
         if offsets is None:
             constant_factor = 1 if log else 0
