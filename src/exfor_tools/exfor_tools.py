@@ -1,3 +1,7 @@
+r"""
+Library tools for parsing EXFOR entries
+"""
+
 import numpy as np
 import periodictable
 from functools import reduce
@@ -192,9 +196,6 @@ def extract_syserr_labels(
 
     Raises:
     ValueError: If the statistical error labels are ambiguous
-
-    Raises:
-    ValueError: If the systematic error labels are ambiguous.
     """
     allowed_sys_err_combos = frozenset([frozenset([l]) for l in allowed_sys_errs])
     sys_err_labels = (
@@ -628,7 +629,8 @@ def attempt_parse_subentry(*args, **kwargs):
         measurements = get_measurements_from_subentry(*args, **kwargs)
     except Exception as e:
         subentry = args[0]
-        print(f"Failed to parse subentry {subentry}:\n\t{e}")
+        if kwargs.get("vocal", False):
+            print(f"Failed to parse subentry {subentry}:\n\t{e}")
         failed_parses[subentry] = e
 
     return measurements, dict(failed_parses)
@@ -845,6 +847,10 @@ class Reaction:
             subentry.reaction[0].proj.getA(),
             subentry.reaction[0].proj.getZ(),
         )
+        if target != self.target or projectile != self.projectile:
+            return False
+
+        # parse product and residual
         product = subentry.reaction[0].products[0]
         if product == "EL":
             product = projectile
@@ -865,12 +871,7 @@ class Reaction:
                 subentry.reaction[0].residual.getA(),
                 subentry.reaction[0].residual.getZ(),
             )
-        return (
-            target == self.target
-            and projectile == self.projectile
-            and product == self.product
-            and residual == self.residual
-        )
+        return product == self.product and residual == self.residual
 
     def __eq__(self, other):
         if not isinstance(other, Reaction):
@@ -983,11 +984,7 @@ class ExforEntry:
         for key, data_set in entry_datasets.items():
 
             if not isinstance(data_set.reaction[0], X4Reaction):
-                e = ValueError(
-                    f"Could not parse reaction {data_set.reaction[0]}"
-                    f" of type {type(data_set.reaction[0])}"
-                )
-                self.failed_parses[key[0]] = (key[0], e)
+                # TODO handle ReactionCombinations
                 continue
 
             quantity = data_set.reaction[0].quantity

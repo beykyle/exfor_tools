@@ -1,3 +1,7 @@
+r"""
+Library tools for interactively curating data sets from EXFOR
+"""
+
 import numpy as np
 
 from matplotlib import pyplot as plt
@@ -138,23 +142,24 @@ class ReactionEntries:
         self,
         reaction: Reaction,
         quantity: str,
+        vocal=False,
         **kwargs,
     ):
         self.reaction = reaction
         self.quantity = quantity
         self.settings = kwargs
-        self.vocal = kwargs.get("vocal", False)
+        self.vocal = vocal
+        kwargs["vocal"] = self.vocal
 
         self.entries, self.failed_parses = self.query(**kwargs)
 
     def query(self, **kwargs):
         if self.vocal:
             print("\n========================================================")
-            print(f"Now parsing {self.quantity} for {self.rxn}")
+            print(f"Now parsing {self.quantity} for {self.reaction.pretty_string}")
             print("\n========================================================")
         entries, failed_parses = query_for_entries(
-            target=self.reaction.target,
-            projectile=self.reaction.projectile,
+            reaction=self.reaction,
             quantity=self.quantity,
             **kwargs,
         )
@@ -229,40 +234,48 @@ class ReactionEntries:
         return axes
 
 
-def get_multiple_quantities(
-    reactions: list[Reaction],
-    quantities: list[str],
-    settings: dict,
-    vocal=False,
-):
-    data = []
-    for quantity in quantities:
-        data.append(ReactionQuantityData())
-
-
-class ReactionQuantityData:
+class MulltiQuantityReactionData:
     r"""
-    Given a single quantity and a list of `Reaction`s, creates a corresponding
+    Given a single `Reaction` and a list of quantities, creates a corresponding
     list of `ReactionEntries` objects holding all the ExforEntry objects for
     that`Reaction` and the quantity of interest
     """
 
     def __init__(
         self,
-        reactions: list[Reaction],
-        quantity: list[str],
+        reaction: Reaction,
+        quantities: list[str],
         settings: dict,
         vocal=False,
     ):
+        self.reaction = reaction
+        self.quantities = quantities
         self.settings = settings
         self.vocal = vocal
         self.data = {}
 
-        for reaction in reactions:
-            self.data[reaction] = ReactionEntries(
-                reaction,
-                self.quantity,
+        for quantity in quantities:
+            self.data[quantity] = ReactionEntries(
+                self.reaction,
+                quantity,
+                vocal=self.vocal,
                 **settings,
+            )
+        self.post_process_entries()
+
+    def post_process_entries(self):
+        r"""
+        Handles duplicate entries, cross referencing and metadata.
+        Should be called again after any failed parses are handled.
+        """
+        # handle duplicates between absolute and ratio to Rutherford
+        # keeping only ratio
+        if set(["dXS/dA", "dXS/dRuth"]).issubset(set(self.quantities)):
+            remove_duplicates(
+                *self.reaction.target,
+                self.data["dXS/dRuth"].entries,
+                self.data["dXS/dA"].entries,
+                vocal=self.vocal,
             )
 
         self.data_by_entry = self.cross_reference_entries()
@@ -274,25 +287,25 @@ class ReactionQuantityData:
 
     def cross_reference_entries(self):
         r"""Builds a dictionary from entry ID to ExforEntry from all of self.data"""
-        entries = {}
-        for reaction, entries in self.data.items():
+        unique_entries = {}
+        for quantity, entries in self.data.items():
             for k, v in entries.entries.items():
-                if k in entries:
-                    entries[k].append(v)
+                if k in unique_entries:
+                    unique_entries[k].append(v)
                 else:
-                    entries[k] = [v]
-        return entries
+                    unique_entries[k] = [v]
+        return unique_entries
 
     def number_of_data_pts(self):
         """return a nested dict of the same structure as self.data but
         with the total number of of data points instead"""
         n_data_pts = {}
         n_measurements = {}
-        for reaction, entries in self.data.items():
-            n_measurements[reaction] = np.sum(
+        for quantity, entries in self.data.items():
+            n_measurements[quantity] = np.sum(
                 [len(entry.measurements) for entry_id, entry in entries.entries.items()]
             )
-            n_data_pts[reaction] = np.sum(
+            n_data_pts[quantity] = np.sum(
                 [
                     np.sum([m.rows for m in entry.measurements])
                     for entry_id, entry in entries.entries.items()
