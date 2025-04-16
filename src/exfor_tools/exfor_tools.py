@@ -46,14 +46,6 @@ quantity_symbols = {
     ("POL/DA", "ANA"): r"$A_y$",
 }
 
-label_matches = dict(
-    zip(
-        ["EN", "ANG-ERR", "DATA-ERR", "ANG-CM", "DATA"],
-        ["Energy", "d(Angle)", "d(Data)", "Angle", "Data"],
-    )
-)
-
-
 unit_symbols = {"no-dim": "unitless", "barns/ster": "b/Sr"}
 
 
