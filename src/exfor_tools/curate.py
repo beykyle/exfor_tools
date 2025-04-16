@@ -120,13 +120,10 @@ def categorize_measurements_by_energy(all_entries, min_num_pts=5, Einc_tol=0.1):
     and sorts them by energy, concatenating ones that are at the same energy
     """
     measurements = []
-    unique_subentries = set()
     for entry, data in all_entries.items():
         for measurement in data.measurements:
-            if measurement.subentry not in unique_subentries:
-                unique_subentries.add(measurement.subentry)
-                if measurement.x.shape[0] > min_num_pts:
-                    measurements.append(measurement)
+            if measurement.x.shape[0] > min_num_pts:
+                measurements.append(measurement)
     return categorize_measurement_list(
         measurements, min_num_pts=min_num_pts, Einc_tol=Einc_tol
     )
@@ -181,8 +178,7 @@ class ReactionEntries:
         failed_parse = self.failed_parses[entry]
         new_entry = ExforEntry(
             entry=failed_parse.entry,
-            target=failed_parse.target,
-            projectile=failed_parse.projectile,
+            reaction=failed_parse.reaction,
             quantity=failed_parse.quantity,
             parsing_kwargs=parsing_kwargs,
             **self.settings,
@@ -192,6 +188,9 @@ class ReactionEntries:
             del self.failed_parses[entry]
         elif self.vocal:
             print("Reattempt parse failed")
+
+    def print_failed_parses(self):
+        print_failed_parses(self.failed_parses)
 
     def plot(
         self,
@@ -341,6 +340,35 @@ def remove_duplicates(A, Z, entries_ppr, entries_pp, vocal=False):
         del entries_pp[k]
 
     return entries_ppr, entries_pp
+
+
+def cross_reference_entry_systematic_err(
+    all_data: list[MulltiQuantityReactionData],
+    default_systematic_normalization_err: float,
+):
+    all_data_by_entry = {}
+    for data in all_data:
+        for entry_id, entries in data.data_by_entry.items():
+            if entry_id in all_data_by_entry:
+                all_data_by_entry[entry_id].extend(entries)
+            else:
+                all_data_by_entry[entry_id] = entries
+
+    sys_uncertainties_by_entry = {}
+    for entry_id, data_sets in all_data_by_entry.items():
+        norm_errs = []
+        for data_set in data_sets:
+            for m in data_set.measurements:
+                norm_errs.append(m.systematic_norm_err)
+        if np.allclose(norm_errs, norm_errs[0]):
+            if np.isclose(norm_errs[0], 0):
+                norm_errs[0] = default_systematic_normalization_err
+            sys_uncertainties_by_entry[entry_id] = norm_errs[0]
+        else:
+            raise ValueError(
+                f"Entry {entry_id} has subentries with different systematic normalization uncertainties"
+            )
+    return all_data_by_entry, sys_uncertainties_by_entry
 
 
 def print_failed_parses(failed_parses):
