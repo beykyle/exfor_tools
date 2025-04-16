@@ -128,20 +128,21 @@ class AngularDistribution:
 
     def __init__(
         self,
-        subentry,
-        x,
-        x_err,
-        y,
-        y_errs,
-        y_err_labels,
-        Einc,
-        Einc_err,
-        Einc_units,
-        Ex,
-        Ex_err,
-        Ex_units,
-        x_units,
-        y_units,
+        subentry: str,
+        x: np.ndarray,
+        x_err: np.ndarray,
+        y: np.ndarray,
+        y_errs: list,
+        y_err_labels: str,
+        Einc: float,
+        Einc_err: float,
+        Einc_units: str,
+        Ex: float,
+        Ex_err: float,
+        Ex_units: str,
+        x_units: str,
+        y_units: str,
+        quantity: str,
     ):
         self.subentry = subentry
         self.Einc = Einc
@@ -160,6 +161,7 @@ class AngularDistribution:
         self.y_errs = [y_err[sort_by_angle] for y_err in y_errs]
         self.y_err_labels = y_err_labels
         self.rows = self.x.shape[0]
+        self.quantity = quantity
 
         assert (
             np.all(self.x[1:] - self.x[:-1] >= 0)
@@ -631,6 +633,7 @@ def attempt_parse_subentry(*args, **kwargs):
 def get_measurements_from_subentry(
     subentry,
     data_set,
+    quantity: str,
     Einc_range=(0, np.inf),
     Ex_range=(0, np.inf),
     elastic_only=False,
@@ -640,7 +643,6 @@ def get_measurements_from_subentry(
 ):
     r"""unrolls subentry into individual arrays for each energy"""
 
-    # TODO allow for custom added error columns
     Einc = parse_inc_energy(data_set)[0]
     Ex = np.nan_to_num(parse_ex_energy(data_set)[0])
     if not np.any(
@@ -674,6 +676,7 @@ def get_measurements_from_subentry(
         Ex_range,
         elastic_only,
         units,
+        quantity,
     )
     measurements = [MeasurementClass(*m, **parsing_kwargs) for m in measurement_data]
     return measurements
@@ -688,19 +691,21 @@ def sort_subentry_data_by_energy(
     Ex_range,
     elastic_only,
     units,
+    quantity,
 ):
     angle_units, Einc_units, Ex_units, xs_units = units
-    Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] <= Einc_range[1])
+    Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] <= Einc_range[1],)
     data = data[:, Einc_mask]
     data_err = data_err[:, Einc_mask]
 
     if not elastic_only:
-        Ex_mask = np.logical_and(data[2, :] >= Ex_range[0], data[2, :] <= Ex_range[1])
+        Ex_mask = np.logical_and(data[2, :] >= Ex_range[0], data[2, :] <= Ex_range[1],)
         data = data[:, Ex_mask]
         data_err = data_err[:, Ex_mask]
 
-    # AngularDistribution objects sorted by incident energy, then excitation energy
-    # or just incident enrgy if elastic_only is True
+    # AngularDistribution objects sorted by incident energy,
+    # then excitation energy or just incident enrgy if
+    # elastic_only is True
     measurements = []
 
     # find set of unique incident energies
@@ -728,6 +733,7 @@ def sort_subentry_data_by_energy(
                     Ex_units,
                     angle_units,
                     xs_units,
+                    quantity,
                 )
             )
         else:
@@ -757,6 +763,7 @@ def sort_subentry_data_by_energy(
                         Ex_units,
                         angle_units,
                         xs_units,
+                        quantity,
                     )
                 )
     return measurements
@@ -778,6 +785,7 @@ def get_exfor_particle_symbol(A, Z):
 class Reaction:
     """Represents a simple A + a -> b + B reaction"""
 
+    # TODO specify if elastic only
     # TODO generalize to multiple products or specific excited residual states
     def __init__(self, target, projectile, residual=None, product=None, mass_kwargs={}):
         if product is None:
@@ -1001,6 +1009,7 @@ class ExforEntry:
                 measurements, failed_parses = attempt_parse_subentry(
                     key[1],
                     data_set,
+                    self.quantity,
                     Einc_range=self.Einc_range,
                     Ex_range=self.Ex_range,
                     elastic_only=elastic_only,
