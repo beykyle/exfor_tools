@@ -694,12 +694,18 @@ def sort_subentry_data_by_energy(
     quantity,
 ):
     angle_units, Einc_units, Ex_units, xs_units = units
-    Einc_mask = np.logical_and(data[0, :] >= Einc_range[0], data[0, :] <= Einc_range[1],)
+    Einc_mask = np.logical_and(
+        data[0, :] >= Einc_range[0],
+        data[0, :] <= Einc_range[1],
+    )
     data = data[:, Einc_mask]
     data_err = data_err[:, Einc_mask]
 
     if not elastic_only:
-        Ex_mask = np.logical_and(data[2, :] >= Ex_range[0], data[2, :] <= Ex_range[1],)
+        Ex_mask = np.logical_and(
+            data[2, :] >= Ex_range[0],
+            data[2, :] <= Ex_range[1],
+        )
         data = data[:, Ex_mask]
         data_err = data_err[:, Ex_mask]
 
