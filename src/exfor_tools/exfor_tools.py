@@ -945,7 +945,7 @@ def extract_err_analysis(common_subent):
     start = False
     for section in sections:
         if start:
-            if section[0] == ' ':
+            if section[0] == " ":
                 start = True
             else:
                 break
