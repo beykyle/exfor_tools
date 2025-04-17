@@ -939,6 +939,24 @@ def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4):
     return True
 
 
+def extract_err_analysis(common_subent):
+    sections = common_subent.__repr__().split("\n")
+    ea_sections = []
+    start = False
+    for section in sections:
+        if start:
+            if section[0] == ' ':
+                start = True
+            else:
+                break
+            ea_sections.append(section)
+
+        if section.find("ERR-ANAL") >= 0:
+            ea_sections.append(section)
+            start = True
+    return "\n".join(ea_sections)
+
+
 class ExforEntry:
 
     def __init__(
@@ -959,8 +977,6 @@ class ExforEntry:
 
         self.vocal = vocal
         self.entry = entry
-        entry_datasets = __EXFOR_DB__.retrieve(ENTRY=entry)[entry].getDataSets()
-
         self.reaction = reaction
         if Einc_range is None:
             Einc_range = (0, np.inf)
@@ -982,6 +998,22 @@ class ExforEntry:
         self.quantity = quantity
         self.exfor_quantities = quantity_matches[quantity]
         self.data_symbol = quantity_symbols[tuple(self.exfor_quantities[0])]
+
+        # parsing
+        entry_data = __EXFOR_DB__.retrieve(ENTRY=entry)[entry]
+        subentry_ids = entry_data.keys()
+        entry_datasets = entry_data.getDataSets()
+
+        # parse common
+        if entry + "001" not in subentry_ids:
+            raise ValueError(f"Missing first subentry in entry {entry}")
+        self.common_subentry = entry_data[entry + "001"]
+        self.meta = self.common_subentry["BIB"].meta(entry + "001")
+
+        # TODO parse any common errors
+        self.err_analysis = extract_err_analysis(self.common_subentry)
+        common = self.common_subentry["COMMON"]
+        common_labels = common.labels
 
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
@@ -1005,13 +1037,6 @@ class ExforEntry:
                 and self.reaction.is_match(data_set, self.vocal)
             ):
 
-                # should be the same for every subentry
-                self.meta = {
-                    "author": data_set.author,
-                    "title": data_set.title,
-                    "year": data_set.year,
-                    "institute": data_set.institute,
-                }
                 measurements, failed_parses = attempt_parse_subentry(
                     key[1],
                     data_set,
