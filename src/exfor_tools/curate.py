@@ -344,7 +344,6 @@ def remove_duplicates(A, Z, entries_ppr, entries_pp, vocal=False):
 
 def cross_reference_entry_systematic_err(
     all_data: list[MulltiQuantityReactionData],
-    default_systematic_normalization_err: float,
 ):
     all_data_by_entry = {}
     for data in all_data:
@@ -354,21 +353,14 @@ def cross_reference_entry_systematic_err(
             else:
                 all_data_by_entry[entry_id] = entries
 
-    sys_uncertainties_by_entry = {}
+    sys_norm_err = {}
     for entry_id, data_sets in all_data_by_entry.items():
         norm_errs = []
         for data_set in data_sets:
             for m in data_set.measurements:
                 norm_errs.append(m.systematic_norm_err)
-        if np.allclose(norm_errs, norm_errs[0]):
-            if np.isclose(norm_errs[0], 0):
-                norm_errs[0] = default_systematic_normalization_err
-            sys_uncertainties_by_entry[entry_id] = norm_errs[0]
-        else:
-            raise ValueError(
-                f"Entry {entry_id} has subentries with different systematic normalization uncertainties"
-            )
-    return all_data_by_entry, sys_uncertainties_by_entry
+            sys_norm_err[entry_id] = norm_errs
+    return all_data_by_entry, sys_norm_err
 
 
 def print_failed_parses(failed_parses):
