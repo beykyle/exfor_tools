@@ -40,12 +40,16 @@ def query_for_entries(reaction: Reaction, quantity: str, **kwargs):
     failed_entries = {}
 
     for entry in entries:
-        parsed_entry = ExforEntry(
-            entry,
-            reaction,
-            quantity,
-            **kwargs,
-        )
+        try:
+            parsed_entry = ExforEntry(
+                entry,
+                reaction,
+                quantity,
+                **kwargs,
+            )
+        except Exception as e:
+            new_exception = type(e)(f"Error while parsing Entry: {entry}")
+            raise new_exception from e
         if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
             successfully_parsed_entries[entry] = parsed_entry
         elif len(parsed_entry.failed_parses) > 0:

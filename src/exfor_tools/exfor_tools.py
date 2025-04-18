@@ -1010,10 +1010,12 @@ class ExforEntry:
         self.common_subentry = entry_data[entry + "001"]
         self.meta = self.common_subentry["BIB"].meta(entry + "001")
 
-        # TODO parse any common errors
+        # parse any common errors
         self.err_analysis = extract_err_analysis(self.common_subentry)
-        common = self.common_subentry["COMMON"]
-        common_labels = common.labels
+        self.common_labels = []
+        if "COMMON" in self.common_subentry.keys():
+            common = self.common_subentry["COMMON"]
+            self.common_labels = common.labels
 
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
