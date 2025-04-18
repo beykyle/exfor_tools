@@ -1021,7 +1021,6 @@ class ExforEntry:
                 common = common_subentry["COMMON"]
                 self.common_labels = common.labels
 
-
         entry_datasets = entry_data.getDataSets()
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
