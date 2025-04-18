@@ -793,6 +793,7 @@ class Reaction:
 
     # TODO specify if elastic only
     # TODO generalize to multiple products or specific excited residual states
+    # TODO put in jitR along with ripl levels/LDs, make nucleus class
     def __init__(self, target, projectile, residual=None, product=None, mass_kwargs={}):
         if product is None:
             product = projectile
