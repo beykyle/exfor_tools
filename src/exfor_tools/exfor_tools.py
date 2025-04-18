@@ -1002,21 +1002,26 @@ class ExforEntry:
         # parsing
         entry_data = __EXFOR_DB__.retrieve(ENTRY=entry)[entry]
         subentry_ids = entry_data.keys()
-        entry_datasets = entry_data.getDataSets()
 
         # parse common
+        self.common_subentry = None
+        self.meta = None
+        self.err_analysis = None
+        self.common_labels = []
+
         if entry + "001" not in subentry_ids:
             raise ValueError(f"Missing first subentry in entry {entry}")
-        self.common_subentry = entry_data[entry + "001"]
-        self.meta = self.common_subentry["BIB"].meta(entry + "001")
+        elif entry_data[entry + "001"] is not None:
+            self.common_subentry = entry_data[entry + "001"]
+            self.meta = self.common_subentry["BIB"].meta(entry + "001")
 
-        # parse any common errors
-        self.err_analysis = extract_err_analysis(self.common_subentry)
-        self.common_labels = []
-        if "COMMON" in self.common_subentry.keys():
-            common = self.common_subentry["COMMON"]
-            self.common_labels = common.labels
+            # parse any common errors
+            self.err_analysis = extract_err_analysis(self.common_subentry)
+            if "COMMON" in self.common_subentry.keys():
+                common = self.common_subentry["COMMON"]
+                self.common_labels = common.labels
 
+        entry_datasets = entry_data.getDataSets()
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
         self.failed_parses = {}

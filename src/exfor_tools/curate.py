@@ -15,7 +15,8 @@ from .exfor_tools import (
 )
 
 
-def query_for_entries(reaction: Reaction, quantity: str, **kwargs):
+# 11848 has an issue https://github.com/afedynitch/x4i3/issues/11
+def query_for_entries(reaction: Reaction, quantity: str, disclude=["11848"], **kwargs):
     """
     Query for entries in the EXFOR database based on projectile, target,
     and quantity.
@@ -40,20 +41,24 @@ def query_for_entries(reaction: Reaction, quantity: str, **kwargs):
     failed_entries = {}
 
     for entry in entries:
-        try:
-            parsed_entry = ExforEntry(
-                entry,
-                reaction,
-                quantity,
-                **kwargs,
-            )
-        except Exception as e:
-            new_exception = type(e)(f"Error while parsing Entry: {entry}")
-            raise new_exception from e
-        if len(parsed_entry.failed_parses) == 0 and len(parsed_entry.measurements) > 0:
-            successfully_parsed_entries[entry] = parsed_entry
-        elif len(parsed_entry.failed_parses) > 0:
-            failed_entries[entry] = parsed_entry
+        if entry not in disclude:
+            try:
+                parsed_entry = ExforEntry(
+                    entry,
+                    reaction,
+                    quantity,
+                    **kwargs,
+                )
+            except Exception as e:
+                new_exception = type(e)(f"Error while parsing Entry: {entry}")
+                raise new_exception from e
+            if (
+                len(parsed_entry.failed_parses) == 0
+                and len(parsed_entry.measurements) > 0
+            ):
+                successfully_parsed_entries[entry] = parsed_entry
+            elif len(parsed_entry.failed_parses) > 0:
+                failed_entries[entry] = parsed_entry
 
     return successfully_parsed_entries, failed_entries
 
