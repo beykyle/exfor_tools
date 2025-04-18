@@ -1005,21 +1005,21 @@ class ExforEntry:
         subentry_ids = entry_data.keys()
 
         # parse common
-        self.common_subentry = None
         self.meta = None
         self.err_analysis = None
         self.common_labels = []
+        self.normalization_uncertainty = 0
 
         if entry + "001" not in subentry_ids:
             raise ValueError(f"Missing first subentry in entry {entry}")
         elif entry_data[entry + "001"] is not None:
-            self.common_subentry = entry_data[entry + "001"]
-            self.meta = self.common_subentry["BIB"].meta(entry + "001")
+            common_subentry = entry_data[entry + "001"]
+            self.meta = common_subentry["BIB"].meta(entry + "001")
 
             # parse any common errors
-            self.err_analysis = extract_err_analysis(self.common_subentry)
-            if "COMMON" in self.common_subentry.keys():
-                common = self.common_subentry["COMMON"]
+            self.err_analysis = extract_err_analysis(common_subentry)
+            if "COMMON" in common_subentry.keys():
+                common = common_subentry["COMMON"]
                 self.common_labels = common.labels
 
         entry_datasets = entry_data.getDataSets()
