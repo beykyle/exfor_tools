@@ -1022,6 +1022,10 @@ class ExforEntry:
                 common = common_subentry["COMMON"]
                 self.common_labels = common.labels
 
+        self.subentry_err_analysis = {}
+        for subentry in subentry_ids:
+            self.subentry_err_analysis[subentry] = extract_err_analysis(entry_data[subentry])
+
         entry_datasets = entry_data.getDataSets()
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []

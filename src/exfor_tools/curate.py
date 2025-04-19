@@ -173,7 +173,7 @@ class ReactionEntries:
             print("\n========================================================")
             print(f"Succesfully parsed {len(entries.keys())} entries")
             print(f"Failed to parse {len(failed_parses.keys())} entries:")
-            print_failed_parses(failed_parses)
+            #print_failed_parses(failed_parses)
             print("\n========================================================")
 
         return entries, failed_parses
@@ -310,14 +310,21 @@ class MulltiQuantityReactionData:
         n_data_pts = {}
         n_measurements = {}
         for quantity, entries in self.data.items():
-            n_measurements[quantity] = np.sum(
-                [len(entry.measurements) for entry_id, entry in entries.entries.items()]
+            n_measurements[quantity] = int(
+                np.sum(
+                    [
+                        len(entry.measurements)
+                        for entry_id, entry in entries.entries.items()
+                    ]
+                )
             )
-            n_data_pts[quantity] = np.sum(
-                [
-                    np.sum([m.rows for m in entry.measurements])
-                    for entry_id, entry in entries.entries.items()
-                ]
+            n_data_pts[quantity] = int(
+                np.sum(
+                    [
+                        np.sum([m.rows for m in entry.measurements])
+                        for entry_id, entry in entries.entries.items()
+                    ]
+                )
             )
 
         return n_data_pts, n_measurements
@@ -376,3 +383,5 @@ def print_failed_parses(failed_parses):
     for k, v in failed_parses.items():
         print(f"Entry: {k}")
         print(v.failed_parses[k][0], " : ", v.failed_parses[k][1])
+        print(v.err_analysis)
+        print(v.subentry_err_analysis[v.failed_parses[k][0]])
