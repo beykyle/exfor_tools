@@ -173,7 +173,7 @@ class ReactionEntries:
             print("\n========================================================")
             print(f"Succesfully parsed {len(entries.keys())} entries")
             print(f"Failed to parse {len(failed_parses.keys())} entries:")
-            #print_failed_parses(failed_parses)
+            # print_failed_parses(failed_parses)
             print("\n========================================================")
 
         return entries, failed_parses
