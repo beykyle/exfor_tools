@@ -12,7 +12,7 @@ from x4i3.exfor_column_parsing import (
 )
 from .db import __EXFOR_DB__
 
-from .Reaction import Reaction
+from .reaction import Reaction, ElasticReaction
 from .parsing import (
     parse_angular_distribution,
     parse_inc_energy,
@@ -20,7 +20,6 @@ from .parsing import (
     quantity_matches,
     quantity_symbols,
     unit_symbols,
-    quantities,
 )
 from .angular_distribution import AngularDistributionSysStatErr
 
@@ -255,13 +254,9 @@ class ExforEntry:
         self.Einc_range = Einc_range
 
         elastic_only = False
-        if (
-            Ex_range is None
-            and self.reaction.product == self.reaction.projectile
-            and self.reaction.residual == self.reaction.target
-        ):
-            Ex_range = (0, 0)
+        if isinstance(reaction, ElasticReaction):
             elastic_only = True
+            Ex_range = (0, 0)
         elif Ex_range is None:
             Ex_range = (0, np.inf)
 
@@ -282,7 +277,7 @@ class ExforEntry:
         self.normalization_uncertainty = 0
 
         if entry + "001" not in subentry_ids:
-            raise ValueError(f"Missing first subentry in entry {entry}")
+            raise ValueError(f"Missing first subentry filter_in entry {entry}")
         elif entry_data[entry + "001"] is not None:
             common_subentry = entry_data[entry + "001"]
             self.meta = common_subentry["BIB"].meta(entry + "001")
@@ -360,7 +355,7 @@ class ExforEntry:
             ax,
             offsets,
             self.data_symbol,
-            self.reaction.latex(),
+            self.reaction.reaction_latex,
             log,
             draw_baseline,
             baseline_offset,

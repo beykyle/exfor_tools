@@ -25,7 +25,7 @@ from x4i3.exfor_column_parsing import (
 
 # these are the supported quantities at the moment
 quantity_matches = {
-    "dXS/dA": [["DA"]],
+    "dXS/dA": [["DA"], ["PAR", "DA"]],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
     "Ay": [["POL/DA", "ANA"]],
 }

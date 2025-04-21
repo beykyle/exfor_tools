@@ -154,7 +154,7 @@ class ReactionEntries:
     def query(self, **kwargs):
         if self.vocal:
             print("\n========================================================")
-            print(f"Now parsing {self.quantity} for {self.reaction.pretty_string}")
+            print(f"Now parsing {self.quantity} for {self.reaction.reaction_string}")
             print("\n========================================================")
         entries, failed_parses = query_for_entries(
             reaction=self.reaction,
@@ -227,7 +227,7 @@ class ReactionEntries:
                 measurements_categorized[idx0:idxf],
                 axes[i],
                 data_symbol=list(self.entries.values())[0].data_symbol,
-                rxn_label=list(self.entries.values())[0].reaction.pretty_string,
+                rxn_label=list(self.entries.values())[0].reaction.reaction_string,
                 label_kwargs=label_kwargs,
                 **plot_kwargs,
             )
