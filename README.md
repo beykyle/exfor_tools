@@ -22,9 +22,11 @@ pip instal exfor_tools -e
 
 ## examples and tutorials
 
-Check out [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/dataset_curation_tutorial.ipynb)
+Check out the tutorials:
+    -   [examples/introductory_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/introductory_tutorial.ipynb)
+    -   [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/dataset_curation_tutorial.ipynb)
 
-This demonstrates how to query for and parse exfor entries, and curate and plot a data set, producing this figure: 
+These demonstrate how to query for and parse exfor entries, and curate and plot data sets. In the first one, you will produce this figure: 
 
 ![](https://github.com/beykyle/exfor_tools/blob/main/assets/lead_208_pp_dxds.png)
 

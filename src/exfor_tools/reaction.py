@@ -244,8 +244,10 @@ class Reaction:
         if residual is not None:
             residual = Particle.parse(residual)
 
+        residual_in_string = True
         if process:
             self.process = process.upper()
+
             if self.process in ["EL", "INL"]:
                 if (product and product != self.projectile) or (
                     residual and residual != self.target
@@ -256,18 +258,21 @@ class Reaction:
                 self.product = self.projectile
                 self.residual = self.target
                 self.Q = 0
+                residual_in_string = False
             elif self.process == "ABS":
                 if product or residual != self.compound_system:
                     raise ValueError("Invalid 'ABS' process reaction configuration.")
                 self.product = None
                 self.residual = self.compound_system
                 self.Q = self.projectile.m0 + self.target.m0 - self.compound_system.m0
+                residual_in_string = False
             elif self.process == "TOT":
                 if product or residual:
                     raise ValueError("Invalid 'TOT' process reaction configuration")
                 self.product = None
                 self.residual = None
                 self.Q = None
+                residual_in_string = False
             elif self.process == "X":
                 if product or not residual:
                     raise ValueError("Invalid 'X' process reaction configuration.")
@@ -276,10 +281,17 @@ class Reaction:
                 self.Q = None
 
             self.exfor_symbol_reaction = f"{self.projectile.exfor()},{self.process}"
-            self.reaction_string = f"{self.target}({self.projectile},"
-            f"{self.process.lower()}){self.residual or ''}"
-            self.reaction_latex = f"{self.target.latex()}({self.projectile.latex()},"
-            f"{self.process.lower()}){self.residual.latex() if self.residual else ''}"
+            self.reaction_string = (
+                f"{self.target}({self.projectile},"
+                + f"{self.process.lower()})"
+            )
+            self.reaction_latex = (
+                f"{self.target.latex()}({self.projectile.latex()},"
+                + f"{self.process.lower()})"
+            )
+            if residual_in_string:
+                self.reaction_string += f"{self.residual}"
+                self.reaction_latex += f"{self.residual.latex()}"
         else:
             if not (product or residual):
                 raise ValueError(
@@ -306,7 +318,10 @@ class Reaction:
             self.reaction_string = (
                 f"{self.target}({self.projectile},{self.product}){self.residual}"
             )
-            self.reaction_latex = f"{self.target.latex()}({self.projectile.latex()},{self.product.latex()}){self.residual.latex()}"
+            self.reaction_latex = (
+                f"{self.target.latex()}({self.projectile.latex()},"
+                + f"{self.product.latex()}){self.residual.latex()}"
+            )
             self.exfor_symbol_reaction = (
                 f"{self.projectile.exfor()},{self.product.exfor()}"
             )
