@@ -17,25 +17,12 @@ from .parsing import (
     parse_angular_distribution,
     parse_inc_energy,
     parse_ex_energy,
+    quantity_matches,
+    quantity_symbols,
+    unit_symbols,
+    quantities,
 )
 from .angular_distribution import AngularDistributionSysStatErr
-
-# these are the supported quantities at the moment
-quantity_matches = {
-    "dXS/dA": [["DA"]],
-    "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
-    "Ay": [["POL/DA", "ANA"]],
-}
-quantities = list(quantity_matches.keys())
-
-quantity_symbols = {
-    ("DA",): r"$\frac{d\sigma}{d\Omega}$",
-    ("DA", "RTH"): r"$\sigma / \sigma_{Rutherford}$",
-    ("DA", "RTH/REL"): r"$\sigma / \sigma_{Rutherford}$",
-    ("POL/DA", "ANA"): r"$A_y$",
-}
-
-unit_symbols = {"no-dim": "unitless", "barns/ster": "b/Sr"}
 
 
 def attempt_parse_subentry(*args, **kwargs):

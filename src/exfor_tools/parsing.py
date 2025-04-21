@@ -23,6 +23,22 @@ from x4i3.exfor_column_parsing import (
 )
 
 
+# these are the supported quantities at the moment
+quantity_matches = {
+    "dXS/dA": [["DA"]],
+    "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
+    "Ay": [["POL/DA", "ANA"]],
+}
+quantities = list(quantity_matches.keys())
+
+quantity_symbols = {
+    ("DA",): r"$\frac{d\sigma}{d\Omega}$",
+    ("DA", "RTH"): r"$\sigma / \sigma_{Rutherford}$",
+    ("DA", "RTH/REL"): r"$\sigma / \sigma_{Rutherford}$",
+    ("POL/DA", "ANA"): r"$A_y$",
+}
+
+unit_symbols = {"no-dim": "unitless", "barns/ster": "b/Sr"}
 energyExParserList = [
     X4MissingErrorColumnPair(
         X4ColumnParser(

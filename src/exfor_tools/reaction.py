@@ -290,6 +290,7 @@ class ElasticReaction(Reaction):
     :param projectile: The projectile nucleus.
     :param kwargs: Additional keyword arguments.
     """
+
     def __init__(self, target, projectile, **kwargs):
         super().__init__(target, projectile, "EL", target, **kwargs)
 
@@ -302,6 +303,7 @@ class InelasticReaction(Reaction):
     :param projectile: The projectile nucleus.
     :param kwargs: Additional keyword arguments.
     """
+
     def __init__(self, target, projectile, **kwargs):
         super().__init__(target, projectile, "INL", target, **kwargs)
 
@@ -314,6 +316,7 @@ class TotalReaction(Reaction):
     :param projectile: The projectile nucleus.
     :param kwargs: Additional keyword arguments.
     """
+
     def __init__(self, target, projectile, **kwargs):
         super().__init__(target, projectile, "TOT", None, **kwargs)
 
@@ -326,6 +329,7 @@ class AbsorptionReaction(Reaction):
     :param projectile: The projectile nucleus.
     :param kwargs: Additional keyword arguments.
     """
+
     def __init__(self, target, projectile, **kwargs):
         super().__init__(target, projectile, "ABS", None, **kwargs)
 
@@ -339,6 +343,7 @@ class InclusiveReaction(Reaction):
     :param residual: The residual nucleus.
     :param kwargs: Additional keyword arguments.
     """
+
     def __init__(self, target, projectile, residual, **kwargs):
         super().__init__(target, projectile, "X", residual, **kwargs)
 
@@ -351,6 +356,7 @@ class GammaCaptureReaction(Reaction):
     :param projectile: The projectile nucleus.
     :param kwargs: Additional keyword arguments.
     """
+
     def __init__(self, target, projectile, **kwargs):
         residual = target + projectile
         product = Gamma()
