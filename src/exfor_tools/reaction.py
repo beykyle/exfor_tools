@@ -282,8 +282,7 @@ class Reaction:
 
             self.exfor_symbol_reaction = f"{self.projectile.exfor()},{self.process}"
             self.reaction_string = (
-                f"{self.target}({self.projectile},"
-                + f"{self.process.lower()})"
+                f"{self.target}({self.projectile}," + f"{self.process.lower()})"
             )
             self.reaction_latex = (
                 f"{self.target.latex()}({self.projectile.latex()},"
