@@ -28,15 +28,7 @@ def query_for_entries(reaction: Reaction, quantity: str, disclude=["11848"], **k
     Returns: A tuple containing successfully parsed entries and failed entries.
     """
 
-    exfor_quantity = quantity_matches[quantity][0][0]
-    entries = __EXFOR_DB__.query(
-        quantity=exfor_quantity,
-        target=reaction.exfor_symbol_target,
-        projectile=reaction.exfor_symbol_projectile,
-        # TODO handle case of reacxtion = "projectile,EL"
-        reaction=f"{reaction.exfor_symbol_projectile},EL",
-    ).keys()
-
+    entries = reaction.query(quantity)
     successfully_parsed_entries = {}
     failed_entries = {}
 
