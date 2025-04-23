@@ -12,7 +12,7 @@ You have a reaction model $f(x,\alpha)$ and you would like to find some data $y(
 
 ## scope
 
-Currently, `exfor_tools` only supports most reactions in EXFOR, but only a small subset of the observables/quantities. The goal is to provide an interface to curate, visualize and construct meaningful covariances of things like partial differential cross sections. Feel free to contribute! If it doesn't meet your needs check out the project it's built on, which is far more complete: [x4i3](https://github.com/afedynitch/x4i3/).
+Currently, `exfor_tools` supports most reactions in EXFOR, but only a small subset of the observables/quantities. Feel free to contribute! If it doesn't meet your needs check out the project it's built on, which is far more complete: [x4i3](https://github.com/afedynitch/x4i3/).
 
 ## quick start
 ```
