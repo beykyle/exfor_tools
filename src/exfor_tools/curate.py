@@ -7,12 +7,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from .db import __EXFOR_DB__
-from .exfor_tools import (
-    ExforEntry,
-    plot_angular_distributions,
-    Reaction,
-    quantity_matches,
-)
+from .exfor_entry import ExforEntry
+from .reaction import Reaction
+from .distribution import AngularDistribution
 
 
 # 11848 has an issue https://github.com/afedynitch/x4i3/issues/11
@@ -223,7 +220,7 @@ class ReactionEntries:
             else:
                 idxf = (i + 1) * n_per_plot
 
-            plot_angular_distributions(
+            AngularDistribution.plot(
                 measurements_categorized[idx0:idxf],
                 axes[i],
                 data_symbol=list(self.entries.values())[0].data_symbol,
