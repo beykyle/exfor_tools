@@ -4,9 +4,15 @@
 # exfor-tools
 Some lightweight tools to grab data from the [EXFOR database](https://www-nds.iaea.org/exfor/) using the [x4i3 library](https://github.com/afedynitch/x4i3/), and organize it for visualization and use in model calibration and uncertainty quantification.
 
+## use case
+
+You have a model $f(x,\alpha)$ and you would like to find some data $y(x)$ to constrain the $\alpha$ in my model. You would like to do this in a statistically rigorous way, in which you take into account various types of uncertainties, including systematic uncertainties that introduce correlations between $y(x_i)$ and $y(x_j)$. You would also like to do this with large data sets comprised of may different experiments. In other words, you would like to curate a data set $y$ -- composed of reaction observables like differential cross sections -- and have the information required to construct a covariance matrix for it. And you would like it to be sorted into computationally convenient data structures that you can use for visualization, or comparison to your model. You've come to the right place.
+
+
+
 ## scope
 
-Currently, `exfor_tools` only supports a small subset of the quantities in EXFOR. The goal is to provide an interface to curate, visualize and construct meaningful covariances of things like partial differential cross sections. Feel free to contribute! If it doesn't meet your needs check out the project it's built on, which is far more complete: [x4i3](https://github.com/afedynitch/x4i3/).
+Currently, `exfor_tools` only supports most reactions in EXFOR, but only a small subset of the observables/quantities. The goal is to provide an interface to curate, visualize and construct meaningful covariances of things like partial differential cross sections. Feel free to contribute! If it doesn't meet your needs check out the project it's built on, which is far more complete: [x4i3](https://github.com/afedynitch/x4i3/).
 
 ## quick start
 ```
