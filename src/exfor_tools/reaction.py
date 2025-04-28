@@ -86,7 +86,6 @@ def is_match(reaction: Reaction, subentry, vocal=False):
     if target != reaction.target or projectile != reaction.projectile:
         return False
 
-
     product = subentry.reaction[0].products[0]
     if isinstance(product, str):
         if product != reaction.process.upper():
