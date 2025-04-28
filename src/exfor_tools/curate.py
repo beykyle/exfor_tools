@@ -222,11 +222,12 @@ class ReactionEntries:
             else:
                 idxf = (i + 1) * n_per_plot
 
+            latex_title = list(self.entries.values())[0].reaction.reaction_latex
             AngularDistribution.plot(
                 measurements_categorized[idx0:idxf],
                 axes[i],
                 data_symbol=list(self.entries.values())[0].data_symbol,
-                rxn_label=list(self.entries.values())[0].reaction.reaction_string,
+                rxn_label=f"${latex_title}$",
                 label_kwargs=label_kwargs,
                 **plot_kwargs,
             )

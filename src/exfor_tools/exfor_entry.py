@@ -213,7 +213,7 @@ class ExforEntry:
             ax,
             offsets,
             self.data_symbol,
-            self.reaction.reaction_latex,
+            f"${self.reaction.reaction_latex}$",
             log,
             draw_baseline,
             baseline_offset,
