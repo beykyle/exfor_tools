@@ -13,8 +13,8 @@ from x4i3.exfor_column_parsing import (
 from .db import __EXFOR_DB__
 
 from .parsing import quantity_matches, quantity_symbols
-from .reaction import Reaction, ElasticReaction
 from .distribution import AngularDistribution
+from . import reaction as rxn
 
 
 def attempt_parse_subentry(MeasurementClass, *args, **kwargs):
@@ -81,7 +81,7 @@ class ExforEntry:
     def __init__(
         self,
         entry: str,
-        reaction: Reaction,
+        reaction: rxn.Reaction,
         quantity: str,
         Einc_range: tuple = None,
         Ex_range: tuple = None,
@@ -102,7 +102,7 @@ class ExforEntry:
         self.Einc_range = Einc_range
 
         elastic_only = False
-        if isinstance(reaction, ElasticReaction):
+        if isinstance(reaction, rxn.ElasticReaction):
             elastic_only = True
             Ex_range = (0, 0)
         elif Ex_range is None:
@@ -172,7 +172,7 @@ class ExforEntry:
             if (
                 quantity in self.exfor_quantities
                 and filter_subentries(data_set, **filter_kwargs)
-                and self.reaction.is_match(data_set, self.vocal)
+                and rxn.is_match(self.reaction, data_set, self.vocal)
             ):
 
                 measurements, failed_parses = attempt_parse_subentry(

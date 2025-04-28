@@ -6,14 +6,15 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 
-from .db import __EXFOR_DB__
 from .exfor_entry import ExforEntry
-from .reaction import Reaction
+from . import reaction as rxn
 from .distribution import AngularDistribution
 
 
 # 11848 has an issue https://github.com/afedynitch/x4i3/issues/11
-def query_for_entries(reaction: Reaction, quantity: str, disclude=["11848"], **kwargs):
+def query_for_entries(
+    reaction: rxn.Reaction, quantity: str, disclude=["11848"], **kwargs
+):
     """
     Query for entries in the EXFOR database based on projectile, target,
     and quantity.
@@ -25,7 +26,7 @@ def query_for_entries(reaction: Reaction, quantity: str, disclude=["11848"], **k
     Returns: A tuple containing successfully parsed entries and failed entries.
     """
 
-    entries = reaction.query(quantity)
+    entries = rxn.query(reaction, quantity)
     successfully_parsed_entries = {}
     failed_entries = {}
 
@@ -135,7 +136,7 @@ class ReactionEntries:
 
     def __init__(
         self,
-        reaction: Reaction,
+        reaction: rxn.Reaction,
         quantity: str,
         vocal=False,
         **kwargs,
@@ -240,7 +241,7 @@ class MulltiQuantityReactionData:
 
     def __init__(
         self,
-        reaction: Reaction,
+        reaction: rxn.Reaction,
         quantities: list[str],
         settings: dict,
         vocal=False,
