@@ -33,7 +33,6 @@ def get_exfor_reaction_query(reaction: Reaction):
         ValueError: If neither process nor product can be determined from the
             reaction.
     """
-    target = get_exfor_particle_symbol(*reaction.target)
     projectile = get_exfor_particle_symbol(*reaction.projectile)
     if reaction.process is not None:
         prod = reaction.process.upper()
@@ -42,7 +41,7 @@ def get_exfor_reaction_query(reaction: Reaction):
     else:
         raise ValueError("Could not figure out process or product from reaction")
 
-    return f"{target}({projectile},{prod})"
+    return f"{projectile},{prod}"
 
 
 def query_for_reaction(reaction: Reaction, quantity: str):
@@ -52,7 +51,7 @@ def query_for_reaction(reaction: Reaction, quantity: str):
 
     Parameters:
         reaction (Reaction): The reaction object to query
-        quantity (str): The quantity to query for in the EXFOR database.
+        quantity (str): The quantity to query
 
     Returns:
         list: A list of keys representing the matching entries in the EXFOR
@@ -87,9 +86,10 @@ def is_match(reaction: Reaction, subentry, vocal=False):
     if target != reaction.target or projectile != reaction.projectile:
         return False
 
+
     product = subentry.reaction[0].products[0]
     if isinstance(product, str):
-        if product != reaction.process:
+        if product != reaction.process.upper():
             return False
     else:
         product = (product.getA(), product.getZ())

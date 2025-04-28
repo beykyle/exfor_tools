@@ -26,7 +26,8 @@ def query_for_entries(
     Returns: A tuple containing successfully parsed entries and failed entries.
     """
 
-    entries = rxn.query(reaction, quantity)
+
+    entries = rxn.query_for_reaction(reaction, quantity)
     successfully_parsed_entries = {}
     failed_entries = {}
 
