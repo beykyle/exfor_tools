@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from .exfor_entry import ExforEntry
 from . import reaction as rxn
 from .distribution import AngularDistribution
+from .parsing import quantity_matches, quantity_symbols
 
 
 # 11848 has an issue https://github.com/afedynitch/x4i3/issues/11
@@ -191,46 +192,14 @@ class ReactionEntries:
     def print_failed_parses(self):
         print_failed_parses(self.failed_parses)
 
-    def plot(
-        self,
-        label_kwargs={
-            "label_energy_err": False,
-            "label_offset": False,
-            "label_incident_energy": True,
-            "label_excitation_energy": False,
-            "label_exfor": True,
-        },
-        plot_kwargs={},
-        n_per_plot=10,
-        y_size=10,
-    ):
+    def plot(self, **kwargs):
         measurements_categorized = categorize_measurements_by_energy(self.entries)
-        N = len(measurements_categorized)
-        num_plots = N // n_per_plot
-        left_over = N % n_per_plot
-        if left_over > 0:
-            num_plots += 1
-
-        fig, axes = plt.subplots(1, num_plots, figsize=(6 * num_plots, y_size))
-        if not isinstance(axes, np.ndarray):
-            axes = [axes]
-        for i in range(num_plots):
-            idx0 = i * n_per_plot
-            if i == num_plots - 1:
-                idxf = N
-            else:
-                idxf = (i + 1) * n_per_plot
-
-            latex_title = list(self.entries.values())[0].reaction.reaction_latex
-            AngularDistribution.plot(
-                measurements_categorized[idx0:idxf],
-                axes[i],
-                data_symbol=list(self.entries.values())[0].data_symbol,
-                rxn_label=f"${latex_title}$",
-                label_kwargs=label_kwargs,
-                **plot_kwargs,
-            )
-        return axes
+        return plot_measurements(
+            self.quantity,
+            self.reaction,
+            measurements_categorized,
+            **kwargs,
+        )
 
 
 class MulltiQuantityReactionData:
@@ -376,3 +345,50 @@ def print_failed_parses(failed_parses):
         print(v.failed_parses[k][0], " : ", v.failed_parses[k][1])
         print(v.err_analysis)
         print(v.subentry_err_analysis[v.failed_parses[k][0]])
+
+
+def plot_measurements(
+    quantity,
+    reaction,
+    measurements_categorized,
+    label_kwargs={
+        "label_energy_err": False,
+        "label_offset": False,
+        "label_incident_energy": True,
+        "label_excitation_energy": False,
+        "label_exfor": True,
+    },
+    plot_kwargs={},
+    n_per_plot=10,
+    y_size=10,
+):
+    latex_title = reaction.reaction_latex
+    exfor_quantity = quantity_matches[quantity][0]
+    quantity_symbol = quantity_symbols[exfor_quantity]
+
+    N = len(measurements_categorized)
+    num_plots = N // n_per_plot
+    left_over = N % n_per_plot
+    if left_over > 0:
+        num_plots += 1
+
+    fig, axes = plt.subplots(1, num_plots, figsize=(6 * num_plots, y_size))
+    if not isinstance(axes, np.ndarray):
+        axes = [axes]
+
+    for i in range(num_plots):
+        idx0 = i * n_per_plot
+        if i == num_plots - 1:
+            idxf = N
+        else:
+            idxf = (i + 1) * n_per_plot
+
+        AngularDistribution.plot(
+            measurements_categorized[idx0:idxf],
+            axes[i],
+            data_symbol=quantity_symbol,
+            rxn_label=f"${latex_title}$",
+            label_kwargs=label_kwargs,
+            **plot_kwargs,
+        )
+    return axes
