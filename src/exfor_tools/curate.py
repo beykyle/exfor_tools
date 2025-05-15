@@ -104,7 +104,9 @@ def categorize_measurement_list(measurements, min_num_pts=5, Einc_tol=0.1):
     """
     energies = np.array([m.Einc for m in measurements])
     unique_energies, idx_sets = find_unique_elements_with_tolerance(energies, Einc_tol)
-    unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets), reverse=True))
+    unique_energies, idx_sets = zip(
+        *sorted(zip(unique_energies, idx_sets), reverse=True)
+    )
 
     sorted_measurements = []
     for idx_set in idx_sets:
