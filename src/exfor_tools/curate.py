@@ -104,7 +104,7 @@ def categorize_measurement_list(measurements, min_num_pts=5, Einc_tol=0.1):
     """
     energies = np.array([m.Einc for m in measurements])
     unique_energies, idx_sets = find_unique_elements_with_tolerance(energies, Einc_tol)
-    unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets)))
+    unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets), reverse=True))
 
     sorted_measurements = []
     for idx_set in idx_sets:
@@ -363,7 +363,7 @@ def plot_measurements(
     y_size=10,
 ):
     latex_title = reaction.reaction_latex
-    exfor_quantity = quantity_matches[quantity][0]
+    exfor_quantity = tuple(quantity_matches[quantity][0])
     quantity_symbol = quantity_symbols[exfor_quantity]
 
     N = len(measurements_categorized)
