@@ -335,6 +335,8 @@ def build_measurement_list(
                 for measurement in entry.measurements:
                     measurements.append((entry.reaction, measurement))
 
+    return measurements
+
 
 def cross_reference_entry_systematic_err(
     all_data: list[MultiQuantityReactionData],
