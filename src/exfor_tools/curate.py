@@ -104,7 +104,9 @@ def categorize_measurement_list(measurements, min_num_pts=5, Einc_tol=0.1):
     """
     energies = np.array([m.Einc for m in measurements])
     unique_energies, idx_sets = find_unique_elements_with_tolerance(energies, Einc_tol)
-    unique_energies, idx_sets = zip(*sorted(zip(unique_energies, idx_sets), reverse=True))
+    unique_energies, idx_sets = zip(
+        *sorted(zip(unique_energies, idx_sets), reverse=True)
+    )
 
     sorted_measurements = []
     for idx_set in idx_sets:
@@ -202,7 +204,7 @@ class ReactionEntries:
         )
 
 
-class MulltiQuantityReactionData:
+class MultiQuantityReactionData:
     r"""
     Given a single `Reaction` and a list of quantities, creates a corresponding
     list of `ReactionEntries` objects holding all the ExforEntry objects for
@@ -318,8 +320,24 @@ def remove_duplicates(A, Z, entries_ppr, entries_pp, vocal=False):
     return entries_ppr, entries_pp
 
 
+def build_measurement_list(
+    quantity: str,
+    data: dict[tuple[int, int], MultiQuantityReactionData],
+    allowed_measurement_quantities=None,
+):
+    if allowed_measurement_quantities is None:
+        allowed_measurement_quantities = [quantity]
+
+    measurements = []
+    for target, data_set in data.items():
+        for q in allowed_measurement_quantities:
+            for entry_id, entry in data_set.data[q].entries.items():
+                for measurement in entry.measurements:
+                    measurements.append((entry.reaction, measurement))
+
+
 def cross_reference_entry_systematic_err(
-    all_data: list[MulltiQuantityReactionData],
+    all_data: list[MultiQuantityReactionData],
 ):
     all_data_by_entry = {}
     for data in all_data:
