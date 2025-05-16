@@ -106,7 +106,7 @@ class Distribution:
     def remove_point_at_index(self, i):
         pass
 
-    def renormalize(self,norm):
+    def renormalize(self, norm):
         pass
 
     def scale_point_at_index(self, i, factor):
