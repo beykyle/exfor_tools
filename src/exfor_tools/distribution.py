@@ -105,11 +105,15 @@ class Distribution:
                 raise ValueError(f"negative errors under label {label}!")
 
         if self.statistical_err_labels is None:
-            self.statistical_err_labels, self.statistical_err_treatment = extract_staterr_labels(
-                self.y_err_labels,
-                expected_sys_errs=frozenset(
-                    self.systematic_err_labels if self.systematic_err_labels is not None else []
-                ),
+            self.statistical_err_labels, self.statistical_err_treatment = (
+                extract_staterr_labels(
+                    self.y_err_labels,
+                    expected_sys_errs=frozenset(
+                        self.systematic_err_labels
+                        if self.systematic_err_labels is not None
+                        else []
+                    ),
+                )
             )
 
         self.statistical_err = np.zeros(
@@ -135,11 +139,15 @@ class Distribution:
             )
 
         if self.systematic_err_labels is None:
-            self.systematic_err_labels, self.systematic_err_treatment = extract_syserr_labels(
-                self.y_err_labels,
-                expected_stat_errs=frozenset(
-                    self.statistical_err_labels if self.statistical_err_labels is not None else []
-                ),
+            self.systematic_err_labels, self.systematic_err_treatment = (
+                extract_syserr_labels(
+                    self.y_err_labels,
+                    expected_stat_errs=frozenset(
+                        self.statistical_err_labels
+                        if self.statistical_err_labels is not None
+                        else []
+                    ),
+                )
             )
 
         self.systematic_offset_err = []
