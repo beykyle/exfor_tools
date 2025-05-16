@@ -9,9 +9,12 @@ from .parsing import (
 
 class Distribution:
     """
-    Stores angular distribution with x and y errors for a given incident and
+    Stores distribution with x and y errors for a given incident and
     residual excitation energy. Allows for multiple y_errs with different
-    labels.
+    labels. Attempts to parse statistical and systematic errors from those
+    labels. Provides functions for updating or adjusting the distribution,
+    e.g. to handle transcription errors, renormalize, or remove outliers,
+    which record a record of any edits for posteriority.
 
     Attributes:
         subentry (str): The subentry identifier.
@@ -98,6 +101,19 @@ class Distribution:
         ):
             raise ValueError("Invalid x data!")
         self.set_errors()
+        self.notes = []
+
+    def remove_point_at_index(self, i):
+        pass
+
+    def renormalize(self,norm):
+        pass
+
+    def scale_point_at_index(self, i, factor):
+        pass
+
+    def translate_point_at_index(self, i, delta):
+        pass
 
     def set_errors(self):
         for err, label in zip(self.y_errs, self.y_err_labels):
