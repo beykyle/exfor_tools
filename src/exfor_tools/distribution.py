@@ -198,7 +198,6 @@ class Distribution:
             )
 
         assert self.statistical_err.shape == (self.rows,)
-        assert self.y_err.shape == (self.rows,)
         assert self.systematic_norm_err.shape == ()
         assert self.systematic_offset_err.shape == ()
         assert self.general_systematic_err.shape == (self.rows,)
