@@ -25,7 +25,6 @@ class Distribution:
         y_err_labels (str): Labels for y errors.
         rows (int): Number of data points.
         statistical_err (np.ndarray): Statistical errors.
-        y_err (np.ndarray): Combined y errors.
         systematic_offset_err (np.ndarray): Systematic offset errors.
         systematic_norm_err (np.ndarray): Systematic normalization errors.
         general_systematic_err (np.ndarray): General systematic errors.
@@ -80,6 +79,10 @@ class Distribution:
         self.quantity = quantity
         self.x_units = x_units
         self.y_units = y_units
+        self.statistical_err_labels = statistical_err_labels
+        self.statistical_err_treatment = statistical_err_treatment
+        self.systematic_err_labels = systematic_err_labels
+        self.systematic_err_treatment = systematic_err_treatment
 
         sort_by_angle = x.argsort()
         self.x = x[sort_by_angle]
@@ -88,31 +91,32 @@ class Distribution:
         self.y_errs = [y_err[sort_by_angle] for y_err in y_errs]
         self.y_err_labels = y_err_labels
         self.rows = self.x.shape[0]
-
-        for err, label in zip(self.y_errs, self.y_err_labels):
-            if np.any(err < 0):
-                raise ValueError(f"negative errors under label {label}!")
-
         if not (
             np.all(self.x[1:] - self.x[:-1] >= 0)
             and self.x[0] >= xbounds[0]
             and self.x[-1] <= xbounds[1]
         ):
             raise ValueError("Invalid x data!")
+        self.set_errors()
 
-        if statistical_err_labels is None:
-            statistical_err_labels, statistical_err_treatment = extract_staterr_labels(
+    def set_errors(self):
+        for err, label in zip(self.y_errs, self.y_err_labels):
+            if np.any(err < 0):
+                raise ValueError(f"negative errors under label {label}!")
+
+        if self.statistical_err_labels is None:
+            self.statistical_err_labels, self.statistical_err_treatment = extract_staterr_labels(
                 self.y_err_labels,
                 expected_sys_errs=frozenset(
-                    systematic_err_labels if systematic_err_labels is not None else []
+                    self.systematic_err_labels if self.systematic_err_labels is not None else []
                 ),
             )
 
         self.statistical_err = np.zeros(
-            (len(statistical_err_labels), self.rows), dtype=np.float64
+            (len(self.statistical_err_labels), self.rows), dtype=np.float64
         )
 
-        for i, label in enumerate(statistical_err_labels):
+        for i, label in enumerate(self.statistical_err_labels):
             if label not in self.y_err_labels:
                 raise ValueError(
                     f"Did not find error column label {label} in subentry {self.subentry}"
@@ -121,21 +125,20 @@ class Distribution:
                 index = self.y_err_labels.index(label)
                 self.statistical_err[i, :] = self.y_errs[index]
 
-        if statistical_err_treatment == "independent":
+        if self.statistical_err_treatment == "independent":
             self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
-        elif statistical_err_treatment == "difference":
+        elif self.statistical_err_treatment == "difference":
             self.statistical_err = -np.diff(self.statistical_err, axis=0)
         else:
             raise ValueError(
-                f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
+                f"Unknown statistical_err_treatment option: {self.statistical_err_treatment}"
             )
 
-        self.y_err = self.statistical_err
-        if systematic_err_labels is None:
-            systematic_err_labels, systematic_err_treatment = extract_syserr_labels(
+        if self.systematic_err_labels is None:
+            self.systematic_err_labels, self.systematic_err_treatment = extract_syserr_labels(
                 self.y_err_labels,
                 expected_stat_errs=frozenset(
-                    statistical_err_labels if statistical_err_labels is not None else []
+                    self.statistical_err_labels if self.statistical_err_labels is not None else []
                 ),
             )
 
@@ -143,7 +146,7 @@ class Distribution:
         self.systematic_norm_err = []
         self.general_systematic_err = []
 
-        for i, label in enumerate(systematic_err_labels):
+        for i, label in enumerate(self.systematic_err_labels):
             if label not in self.y_err_labels:
                 raise ValueError(
                     f"Did not find error column label {label} in subentry {self.subentry}"
@@ -170,7 +173,7 @@ class Distribution:
         self.systematic_norm_err = np.array(self.systematic_norm_err)
         self.systematic_offset_err = np.array(self.systematic_offset_err)
 
-        if systematic_err_treatment == "independent":
+        if self.systematic_err_treatment == "independent":
             self.systematic_offset_err = np.sqrt(
                 np.sum(self.systematic_offset_err**2, axis=0)
             )
@@ -183,7 +186,7 @@ class Distribution:
         else:
             raise ValueError(
                 "Unknown systematic_err_treatment option:"
-                f" {systematic_err_treatment}"
+                f" {self.systematic_err_treatment}"
             )
 
         assert self.statistical_err.shape == (self.rows,)
@@ -334,7 +337,7 @@ class AngularDistribution(Distribution):
                     np.copy(measurement.x),
                     np.copy(measurement.x_err),
                     np.copy(measurement.y),
-                    np.copy(measurement.y_err),
+                    np.copy(measurement.statistical_err),
                     offset,
                     log,
                 )
