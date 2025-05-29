@@ -22,7 +22,7 @@ Currently, `exfor_tools` supports most reactions in EXFOR, but only a small subs
 Package hosted at [pypi.org/project/exfor-tools/](https://pypi.org/project/exfor-tools/). Otherwise, for development, simply clone the repo and install locally:
 
 ```
-git clone git@github.com:beykyle/exfor_tools.git
+git clone git@github.com:beykyle/exfor_tools.git --recurse-submodules
 pip instal exfor_tools -e 
 ```
 
