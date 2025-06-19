@@ -30,7 +30,6 @@ class Distribution:
         statistical_err (np.ndarray): Statistical errors.
         systematic_offset_err (np.ndarray): Systematic offset errors.
         systematic_norm_err (np.ndarray): Systematic normalization errors.
-        general_systematic_err (np.ndarray): General systematic errors.
     """
 
     def __init__(
@@ -103,18 +102,6 @@ class Distribution:
         self.set_errors()
         self.notes = []
 
-    def remove_point_at_index(self, i):
-        pass
-
-    def renormalize(self, norm):
-        pass
-
-    def scale_point_at_index(self, i, factor):
-        pass
-
-    def translate_point_at_index(self, i, delta):
-        pass
-
     def set_errors(self):
         for err, label in zip(self.y_errs, self.y_err_labels):
             if np.any(err < 0):
@@ -168,7 +155,6 @@ class Distribution:
 
         self.systematic_offset_err = []
         self.systematic_norm_err = []
-        self.general_systematic_err = []
 
         for i, label in enumerate(self.systematic_err_labels):
             if label not in self.y_err_labels:
@@ -179,21 +165,16 @@ class Distribution:
                 index = self.y_err_labels.index(label)
                 err = self.y_errs[index]
                 ratio = err / self.y
-                if np.allclose(ratio, ratio[0]):
-                    self.systematic_norm_err.append(ratio[0])
-                elif np.allclose(err, err[0]):
-                    self.systematic_offset_err.append(err[0])
+                if np.allclose(err, err[0]):
+                    self.systematic_offset_err.append(err)
                 else:
-                    self.general_systematic_err.append(err)
+                    self.systematic_norm_err.append(ratio)
 
-        if self.general_systematic_err == []:
-            self.general_systematic_err = [np.zeros((self.rows))]
         if self.systematic_norm_err == []:
-            self.systematic_norm_err = [0]
+            self.systematic_norm_err = [np.zeros((self.rows))]
         if self.systematic_offset_err == []:
-            self.systematic_offset_err = [0]
+            self.systematic_offset_err = [np.zeros((self.rows))]
 
-        self.general_systematic_err = np.array(self.general_systematic_err)
         self.systematic_norm_err = np.array(self.systematic_norm_err)
         self.systematic_offset_err = np.array(self.systematic_offset_err)
 
@@ -204,9 +185,6 @@ class Distribution:
             self.systematic_norm_err = np.sqrt(
                 np.sum(self.systematic_norm_err**2, axis=0)
             )
-            self.general_systematic_err = np.sqrt(
-                np.sum(self.general_systematic_err**2, axis=0)
-            )
         else:
             raise ValueError(
                 "Unknown systematic_err_treatment option:"
@@ -214,9 +192,8 @@ class Distribution:
             )
 
         assert self.statistical_err.shape == (self.rows,)
-        assert self.systematic_norm_err.shape == ()
-        assert self.systematic_offset_err.shape == ()
-        assert self.general_systematic_err.shape == (self.rows,)
+        assert self.systematic_norm_err.shape == (self.rows,)
+        assert self.systematic_offset_err.shape == (self.rows,)
 
     @classmethod
     def parse_subentry(
