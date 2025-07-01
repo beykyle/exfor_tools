@@ -325,6 +325,17 @@ def build_measurement_list(
     data: dict[tuple[int, int], MultiQuantityReactionData],
     allowed_measurement_quantities=None,
 ):
+    r"""
+    Builds a list of measurements from the data dictionary.
+
+    Parameters:
+    quantity: str
+        The quantity of interest.
+    data: dict
+        A dictionary mapping target tuples to MultiQuantityReactionData objects.
+    allowed_measurement_quantities: list, optional
+        A list of allowed measurement
+    """
     if allowed_measurement_quantities is None:
         allowed_measurement_quantities = [quantity]
 
@@ -334,6 +345,39 @@ def build_measurement_list(
             for entry_id, entry in data_set.data[q].entries.items():
                 for measurement in entry.measurements:
                     measurements.append((entry.reaction, measurement))
+
+    return measurements
+
+
+def build_measurement_dict(
+    quantity: str,
+    data: dict[tuple[int, int], MultiQuantityReactionData],
+    allowed_measurement_quantities=None,
+):
+    r"""
+    Builds a dictionary of measurements categorized by entry ID.
+    The keys are entry IDs, and the values are lists of tuples
+    containing the reaction and measurement.
+
+    Parameters:
+    quantity: str
+        The quantity of interest.
+    data: dict
+        A dictionary mapping target tuples to MultiQuantityReactionData objects.
+    allowed_measurement_quantities: list, optional
+        A list of allowed measurement
+    """
+    if allowed_measurement_quantities is None:
+        allowed_measurement_quantities = [quantity]
+
+    measurements = {}
+    for target, data_set in data.items():
+        for q in allowed_measurement_quantities:
+            for entry_id, entry in data_set.data[q].entries.items():
+                if entry_id not in measurements:
+                    measurements[entry_id] = []
+                for measurement in entry.measurements:
+                    measurements[entry_id].append((entry.reaction, measurement))
 
     return measurements
 
