@@ -31,7 +31,7 @@ def attempt_parse_subentry(MeasurementClass, *args, **kwargs):
     return measurements, dict(failed_parses)
 
 
-def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4):
+def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4, allow_cos=False):
     angle_labels = [
         l
         for l in data_set.labels
@@ -46,6 +46,21 @@ def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4):
             )
         )
     ]
+    if allow_cos is True:
+        angle_labels = [
+            l
+            for l in data_set.labels
+            if (
+                "COS" in l
+                and "-NRM" not in l
+                and np.all(
+                    [
+                        f not in l
+                        for f in errorSuffix + resolutionFWSuffix + resolutionHWSuffix
+                    ]
+                )
+            )
+        ]
 
     if len(angle_labels) == 0:
         return False
