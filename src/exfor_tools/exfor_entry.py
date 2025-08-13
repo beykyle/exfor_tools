@@ -47,7 +47,7 @@ def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4, allow_cos=
         )
     ]
     if allow_cos is True:
-        angle_labels = [
+        angle_labels += [
             l
             for l in data_set.labels
             if (
