@@ -179,17 +179,21 @@ def parse_ex_energy(data_set):
 
 
 def parse_angle(data_set):
-    # TODO handle cosine or momentum transfer
-    # TODO how does this handle multiple matched entries
     angle = reduce(condenseColumn, [c.getValue(data_set) for c in angleParserList])
     if angle[1] != "degrees":
         raise ValueError(f"Cannot parse angle in units of {angle[1]}")
-    if angle[0][-3:] != "-CM":
-        raise NotImplementedError("Angle in lab frame!")
     angle = np.array(
         angle[2:],
         dtype=np.float64,
     )
+    if angle[0][-3:] == "-CM":
+        units = "CM-degrees"
+    elif angle[0][-3:] == "-LAB":
+        units = "LAB-degrees"
+    else:
+        raise ValueError(
+            f"Cannot parse angle frame from {angle[0]}, expected -CM or -LAB suffix"
+        )
     angle_err = reduce(condenseColumn, [c.getError(data_set) for c in angleParserList])
     missing_err = np.all([a is None for a in angle_err[2:]])
     if not missing_err:
@@ -199,7 +203,7 @@ def parse_angle(data_set):
         angle_err[2:],
         dtype=np.float64,
     )
-    return angle, angle_err, "degrees"
+    return angle, angle_err, units
 
 
 def parse_inc_energy(data_set):
