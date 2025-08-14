@@ -7,7 +7,6 @@ from .parsing import (
     parse_ex_energy,
     unit_symbols,
 )
-from .reaction import Reaction
 
 data_types_json = {
     "ECS": "dXS/dA",
@@ -394,10 +393,10 @@ class AngularDistribution(Distribution):
         return offsets
 
     def to_json(self, citation: str = "") -> str:
-        if self.x_units != "degrees":
-            raise NotImplementedError("Expected angle units to be degrees")
         data = {
-            "type": data_types_json[self.quantity],
+            "type": next(
+                (k for k, v in data_types_json.items() if v == self.quantity), "unknown"
+            ),
             "energy": float(self.Einc),
             "energy-err": float(self.Einc_err),
             "ex-energy": float(self.Ex),
