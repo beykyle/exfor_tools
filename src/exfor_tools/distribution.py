@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 from .parsing import (
     parse_angular_distribution,
@@ -5,6 +7,13 @@ from .parsing import (
     parse_ex_energy,
     unit_symbols,
 )
+from .reaction import Reaction
+
+data_types_json = {
+    "ECS": "dXS/dA",
+    "APower": "Ay",
+    "ECS_Rutherford": "dXS/dRuth",
+}
 
 
 class Distribution:
@@ -383,6 +392,62 @@ class AngularDistribution(Distribution):
             ax.set_yscale("log")
 
         return offsets
+
+    def to_json(self, citation: str = "") -> str:
+        if self.x_units != "degrees":
+            raise NotImplementedError("Expected angle units to be degrees")
+        data = {
+            "type": data_types_json[self.quantity],
+            "energy": float(self.Einc),
+            "energy-err": float(self.Einc_err),
+            "ex-energy": float(self.Ex),
+            "ex-energy-err": float(self.Ex_err),
+            "ex-energy-units": self.Ex_units,
+            "energy-units": self.Einc_units,
+            "EXFORAccessionNumber": self.subentry,
+            "source": citation,
+            "data": {
+                "angle": self.x.tolist(),
+                "angle-units": self.x_units,
+                "angle-err": self.x_err.tolist(),
+                "cs": self.y.tolist(),
+                "cs-units": self.y_units,
+                "cs-err": self.statistical_err.tolist(),
+                "systematic_normalization_error": self.systematic_norm_err.tolist(),
+                "systematic_offset_error": self.systematic_offset_err.tolist(),
+            },
+        }
+        return json.dumps(data, indent=4)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "Distribution":
+        data = json.loads(json_str)
+
+        return AngularDistribution(
+            Einc=data["energy"],
+            Einc_err=data.get("energy-err", 0.0),  # Default to 0 if not provided
+            Einc_units=data["energy-units"],
+            Ex=data.get("ex-energy", 0.0),  # Default to 0 if not provided
+            Ex_err=data.get("ex-energy-err", 0.0),  # Default to 0 if not provided
+            Ex_units=data.get(
+                "ex-energy-units", "MeV"
+            ),  # Default to MeV if not provided
+            subentry=data["EXFORAccessionNumber"],
+            quantity=data_types_json.get(data["type"], "unknown"),
+            x_units=data["data"]["angle-units"],
+            y_units=data["data"]["cs-units"],
+            x=np.array(data["data"]["angle"]),
+            x_err=np.array(data["data"].get("angle-err", [])),
+            y=np.array(data["data"]["cs"]),
+            y_errs=[np.array(data["data"]["cs-err"])],
+            y_err_labels=["cs-err"],
+            systematic_norm_err=np.array(
+                data["data"].get("systematic_normalization_error", [])
+            ),
+            systematic_offset_err=np.array(
+                data["data"].get("systematic_offset_error", [])
+            ),
+        )
 
 
 def extract_syserr_labels(
