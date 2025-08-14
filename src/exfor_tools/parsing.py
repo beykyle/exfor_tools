@@ -182,18 +182,18 @@ def parse_angle(data_set):
     angle = reduce(condenseColumn, [c.getValue(data_set) for c in angleParserList])
     if angle[1] != "degrees":
         raise ValueError(f"Cannot parse angle in units of {angle[1]}")
-    angle = np.array(
-        angle[2:],
-        dtype=np.float64,
-    )
-    if angle[0][-3:] == "-CM":
+    if angle[0] == "ANG-CM":
         units = "CM-degrees"
-    elif angle[0][-3:] == "-LAB":
+    elif angle[0][-3:] == "ANG":
         units = "LAB-degrees"
     else:
         raise ValueError(
             f"Cannot parse angle frame from {angle[0]}, expected -CM or -LAB suffix"
         )
+    angle = np.array(
+        angle[2:],
+        dtype=np.float64,
+    )
     angle_err = reduce(condenseColumn, [c.getError(data_set) for c in angleParserList])
     missing_err = np.all([a is None for a in angle_err[2:]])
     if not missing_err:
