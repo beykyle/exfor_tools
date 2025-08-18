@@ -49,6 +49,72 @@ class Distribution:
         x: np.ndarray,
         x_err: np.ndarray,
         y: np.ndarray,
+        statistical_err: np.ndarray,
+        systematic_norm_err: np.ndarray,
+        systematic_offset_err: np.ndarray,
+        xbounds=(-np.inf, np.inf),
+    ):
+        """
+        Initializes the Distribution class with given parameters.
+        Parameters:
+        -----------
+            subentry: str
+                The subentry identifier.
+            quantity: str
+                The quantity being measured.
+            x_units: str
+                Units for the x values.
+            y_units: str
+                Units for the y values.
+            x: np.ndarray
+                Array of x values.
+            x_err: np.ndarray
+                Array of x errors.
+            y: np.ndarray
+                Array of y values.
+            statistical_err: np.ndarray
+                Statistical errors.
+            systematic_norm_err: np.ndarray
+                Systematic normalization errors.
+            systematic_offset_err: np.ndarray
+                Systematic offset errors.
+            xbounds: tuple, optional
+                Bounds for x values. Defaults to (-np.inf, np.inf).
+        """
+        self.subentry = subentry
+        self.quantity = quantity
+        self.x_units = x_units
+        self.y_units = y_units
+
+        sort_by_x = x.argsort()
+        self.x = x[sort_by_x]
+        self.x_err = x_err[sort_by_x]
+        self.y = y[sort_by_x]
+
+        self.rows = self.x.shape[0]
+        if not (
+            np.all(self.x[1:] - self.x[:-1] >= 0)
+            and self.x[0] >= xbounds[0]
+            and self.x[-1] <= xbounds[1]
+        ):
+            raise ValueError("Invalid x data!")
+
+        self.notes = []
+
+        self.statistical_err = statistical_err[sort_by_x]
+        self.systematic_norm_err = systematic_norm_err[sort_by_x]
+        self.systematic_offset_err = systematic_offset_err[sort_by_x]
+
+    @classmethod
+    def parse_errs_and_init(
+        cls,
+        subentry: str,
+        quantity: str,
+        x_units: str,
+        y_units: str,
+        x: np.ndarray,
+        x_err: np.ndarray,
+        y: np.ndarray,
         y_errs: list[np.ndarray],
         y_err_labels: list[str],
         xbounds=(-np.inf, np.inf),
@@ -58,164 +124,197 @@ class Distribution:
         systematic_err_treatment="independent",
     ):
         """
-        Initializes the Distribution class with given parameters.
+        Attempts to construct a Distribution object from the given parameters. Given
+        a list of y errors with arbitrary labels, attempts to categorize them into
+        statistical and systematic errors, and returns a Distribution object with
+        those errors categorized.
 
-        Params:
-            subentry (str): The subentry identifier.
-            quantity (str): The quantity being measured.
-            x_units (str): Units for the x values.
-            y_units (str): Units for the y values.
-            x (np.ndarray): Array of x values.
-            x_err (np.ndarray): Array of x errors.
-            y (np.ndarray): Array of y values.
-            y_errs (list): List of y error arrays.
-            y_err_labels (str): Labels for y errors.
-            xbounds (tuple, optional): Bounds for x values. Defaults to (-np.inf, np.inf).
-            statistical_err_labels (list, optional): Labels for statistical errors.
-            statistical_err_treatment (str, optional): Treatment for statistical errors.
-                Defaults to "independent".
-            systematic_err_labels (list, optional): Labels for systematic errors.
-            systematic_err_treatment (str, optional): Treatment for systematic errors.
-                Defaults to "independent".
+        Parameters:
+        ----------
+            subentry: str
+                The subentry identifier.
+            quantity: str
+                The quantity being measured.
+            x_units: str
+                Units for the x values.
+            y_units: str
+                Units for the y values.
+            x: np.ndarray
+                Array of x values.
+            x_err: np.ndarray
+                Array of x errors.
+            y: np.ndarray
+                Array of y values.
+            y_errs: list[np.ndarray]
+                List of arrays containing y errors.
+            y_err_labels: list[str]
+                Labels corresponding to each array in y_errs.
+            xbounds: tuple, optional
+                Bounds for x values. Defaults to (-np.inf, np.inf).
+            statistical_err_labels: list[str], optional
+                Labels for statistical errors. If None, will be determined from y_err_labels.
+            statistical_err_treatment: str, optional
+                Method to treat statistical errors. Defaults to "independent".
+            systematic_err_labels: list[str], optional
+                Labels for systematic errors. If None, will be determined from y_err_labels.
+            systematic_err_treatment: str, optional
+                Method to treat systematic errors. Defaults to "independent".
+
+        Returns:
+        ----------
+            Distribution :
+                A Distribution object with categorized errors.
 
         Raises:
+        ----------
             ValueError: If a column label in systematic_err_labels is not found in the
                 subentry, or if an unknown systematic_err_treatment is provided, or the
                 systematic error column is non-uniform across angle.
             ValueError: If a column label in statistical_err_labels is not found in the
                 subentry or if an unknown statistical_err_treatment is provided.
         """
-        self.subentry = subentry
-        self.quantity = quantity
-        self.x_units = x_units
-        self.y_units = y_units
-        self.statistical_err_labels = statistical_err_labels
-        self.statistical_err_treatment = statistical_err_treatment
-        self.systematic_err_labels = systematic_err_labels
-        self.systematic_err_treatment = systematic_err_treatment
+        sort_by_x = x.argsort()
+        y_errs = [y_err[sort_by_x] for y_err in y_errs]
+        y_err_labels = y_err_labels
+        (
+            statistical_err,
+            systematic_norm_err,
+            systematic_offset_err,
+            statistical_err_labels,
+            systematic_err_labels,
+        ) = cls.determine_error_categories(
+            subentry,
+            len(x),
+            y[sort_by_x],
+            y_errs,
+            y_err_labels,
+            statistical_err_labels,
+            statistical_err_treatment,
+            systematic_err_labels,
+            systematic_err_treatment,
+        )
+        return cls(
+            subentry,
+            quantity,
+            x_units,
+            y_units,
+            x[sort_by_x],
+            x_err[sort_by_x],
+            y[sort_by_x],
+            statistical_err,
+            systematic_norm_err,
+            systematic_offset_err,
+            xbounds=xbounds,
+        )
 
-        sort_by_angle = x.argsort()
-        self.x = x[sort_by_angle]
-        self.x_err = x_err[sort_by_angle]
-        self.y = y[sort_by_angle]
-        self.y_errs = [y_err[sort_by_angle] for y_err in y_errs]
-        self.y_err_labels = y_err_labels
-        self.rows = self.x.shape[0]
-        if not (
-            np.all(self.x[1:] - self.x[:-1] >= 0)
-            and self.x[0] >= xbounds[0]
-            and self.x[-1] <= xbounds[1]
-        ):
-            raise ValueError("Invalid x data!")
-        self.set_errors()
-        self.notes = []
-
-    def set_errors(self):
-        for err, label in zip(self.y_errs, self.y_err_labels):
+    @staticmethod
+    def determine_error_categories(
+        subentry,
+        rows,
+        y,
+        y_errs,
+        y_err_labels,
+        statistical_err_labels,
+        statistical_err_treatment,
+        systematic_err_labels,
+        systematic_err_treatment,
+    ):
+        for err, label in zip(y_errs, y_err_labels):
             if np.any(err < 0):
                 raise ValueError(f"negative errors under label {label}!")
 
-        if self.statistical_err_labels is None:
-            self.statistical_err_labels, self.statistical_err_treatment = (
-                extract_staterr_labels(
-                    self.y_err_labels,
-                    expected_sys_errs=frozenset(
-                        self.systematic_err_labels
-                        if self.systematic_err_labels is not None
-                        else []
-                    ),
-                )
+        if statistical_err_labels is None:
+            statistical_err_labels, statistical_err_treatment = extract_staterr_labels(
+                y_err_labels,
+                expected_sys_errs=frozenset(
+                    systematic_err_labels if systematic_err_labels is not None else []
+                ),
             )
 
-        self.statistical_err = np.zeros(
-            (len(self.statistical_err_labels), self.rows), dtype=np.float64
+        statistical_err = np.zeros(
+            (len(statistical_err_labels), rows), dtype=np.float64
         )
 
-        for i, label in enumerate(self.statistical_err_labels):
-            if label not in self.y_err_labels:
+        for i, label in enumerate(statistical_err_labels):
+            if label not in y_err_labels:
                 raise ValueError(
-                    f"Did not find error column label {label} in subentry {self.subentry}"
+                    f"Did not find error column label {label} in subentry {subentry}"
                 )
             else:
-                index = self.y_err_labels.index(label)
-                self.statistical_err[i, :] = self.y_errs[index]
+                index = y_err_labels.index(label)
+                statistical_err[i, :] = y_errs[index]
 
-        if self.statistical_err_treatment == "independent":
-            self.statistical_err = np.sqrt(np.sum(self.statistical_err**2, axis=0))
-        elif self.statistical_err_treatment == "difference":
-            self.statistical_err = -np.diff(self.statistical_err, axis=0)
+        if statistical_err_treatment == "independent":
+            statistical_err = np.sqrt(np.sum(statistical_err**2, axis=0))
+        elif statistical_err_treatment == "difference":
+            statistical_err = -np.diff(statistical_err, axis=0)
         else:
             raise ValueError(
-                f"Unknown statistical_err_treatment option: {self.statistical_err_treatment}"
+                f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
             )
 
-        if self.systematic_err_labels is None:
-            self.systematic_err_labels, self.systematic_err_treatment = (
-                extract_syserr_labels(
-                    self.y_err_labels,
-                    expected_stat_errs=frozenset(
-                        self.statistical_err_labels
-                        if self.statistical_err_labels is not None
-                        else []
-                    ),
-                )
+        if systematic_err_labels is None:
+            systematic_err_labels, systematic_err_treatment = extract_syserr_labels(
+                y_err_labels,
+                expected_stat_errs=frozenset(
+                    statistical_err_labels if statistical_err_labels is not None else []
+                ),
             )
 
-        self.systematic_offset_err = []
-        self.systematic_norm_err = []
+        systematic_offset_err = []
+        systematic_norm_err = []
 
-        for i, label in enumerate(self.systematic_err_labels):
-            if label not in self.y_err_labels:
+        for i, label in enumerate(systematic_err_labels):
+            if label not in y_err_labels:
                 raise ValueError(
-                    f"Did not find error column label {label} in subentry {self.subentry}"
+                    f"Did not find error column label {label} in subentry {subentry}"
                 )
             else:
-                index = self.y_err_labels.index(label)
-                err = self.y_errs[index]
-                ratio = err / self.y
+                index = y_err_labels.index(label)
+                err = y_errs[index]
+                ratio = err / y
                 if np.allclose(err, err[0]):
-                    self.systematic_offset_err.append(err)
+                    systematic_offset_err.append(err)
                 else:
-                    self.systematic_norm_err.append(ratio)
+                    systematic_norm_err.append(ratio)
 
-        if self.systematic_norm_err == []:
-            self.systematic_norm_err = [np.zeros((self.rows))]
-        if self.systematic_offset_err == []:
-            self.systematic_offset_err = [np.zeros((self.rows))]
+        if systematic_norm_err == []:
+            systematic_norm_err = [np.zeros((rows))]
+        if systematic_offset_err == []:
+            systematic_offset_err = [np.zeros((rows))]
 
-        self.systematic_norm_err = np.array(self.systematic_norm_err)
-        self.systematic_offset_err = np.array(self.systematic_offset_err)
+        systematic_norm_err = np.array(systematic_norm_err)
+        systematic_offset_err = np.array(systematic_offset_err)
 
-        if self.systematic_err_treatment == "independent":
-            self.systematic_offset_err = np.sqrt(
-                np.sum(self.systematic_offset_err**2, axis=0)
-            )
-            self.systematic_norm_err = np.sqrt(
-                np.sum(self.systematic_norm_err**2, axis=0)
-            )
+        if systematic_err_treatment == "independent":
+            systematic_offset_err = np.sqrt(np.sum(systematic_offset_err**2, axis=0))
+            systematic_norm_err = np.sqrt(np.sum(systematic_norm_err**2, axis=0))
         else:
             raise ValueError(
                 "Unknown systematic_err_treatment option:"
-                f" {self.systematic_err_treatment}"
+                f" {systematic_err_treatment}"
             )
 
-        assert self.statistical_err.shape == (self.rows,)
-        assert self.systematic_norm_err.shape == (self.rows,)
-        assert self.systematic_offset_err.shape == (self.rows,)
+        assert statistical_err.shape == (rows,)
+        assert systematic_norm_err.shape == (rows,)
+        assert systematic_offset_err.shape == (rows,)
 
-    @classmethod
-    def parse_subentry(
-        cls,
-        data_set,
-        quantity: str,
-        vocal=False,
-        parsing_kwargs={},
-    ):
-        pass
+        return (
+            statistical_err,
+            systematic_norm_err,
+            systematic_offset_err,
+            statistical_err_labels,
+            systematic_err_labels,
+        )
 
     @classmethod
     def plot(cls):
-        pass
+        """
+        Plots the distribution on the given axis.
+        """
+        raise NotImplementedError(
+            "Plotting not implemented for base Distribution class."
+        )
 
 
 class AngularDistribution(Distribution):
@@ -233,15 +332,50 @@ class AngularDistribution(Distribution):
         Ex_err: float,
         Ex_units: str,
         *args,
-        **kwargs,
     ):
-        super().__init__(*args, xbounds=(0, 180), **kwargs)
+        super().__init__(*args, xbounds=(0, 180))
         self.Einc = Einc
         self.Einc_err = Einc_err
         self.Einc_units = Einc_units
         self.Ex = Ex
         self.Ex_err = Ex_err
         self.Ex_units = Ex_units
+
+    @classmethod
+    def parse_errs_and_init(
+        cls,
+        Einc: float,
+        Einc_err: float,
+        Einc_units: str,
+        Ex: float,
+        Ex_err: float,
+        Ex_units: str,
+        *args,
+        **kwargs,
+    ):
+        d = Distribution.parse_errs_and_init(
+            *args,
+            xbounds=(0, 180),
+            **kwargs,
+        )
+        return cls(
+            Einc,
+            Einc_err,
+            Einc_units,
+            Ex,
+            Ex_err,
+            Ex_units,
+            d.subentry,
+            d.quantity,
+            d.x_units,
+            d.y_units,
+            d.x,
+            d.x_err,
+            d.y,
+            d.statistical_err,
+            d.systematic_norm_err,
+            d.systematic_offset_err,
+        )
 
     @classmethod
     def parse_subentry(
@@ -419,34 +553,35 @@ class AngularDistribution(Distribution):
         return json.dumps(data, indent=4)
 
     @classmethod
-    def from_json(cls, json_str: str) -> "Distribution":
+    def from_json(cls, json_str: str):
         data = json.loads(json_str)
-
-        return AngularDistribution(
-            Einc=data["energy"],
-            Einc_err=data.get("energy-err", 0.0),  # Default to 0 if not provided
-            Einc_units=data["energy-units"],
-            Ex=data.get("ex-energy", 0.0),  # Default to 0 if not provided
-            Ex_err=data.get("ex-energy-err", 0.0),  # Default to 0 if not provided
-            Ex_units=data.get(
-                "ex-energy-units", "MeV"
-            ),  # Default to MeV if not provided
-            subentry=data["EXFORAccessionNumber"],
-            quantity=data_types_json.get(data["type"], "unknown"),
-            x_units=data["data"]["angle-units"],
-            y_units=data["data"]["cs-units"],
-            x=np.array(data["data"]["angle"]),
-            x_err=np.array(data["data"].get("angle-err", [])),
-            y=np.array(data["data"]["cs"]),
-            y_errs=[np.array(data["data"]["cs-err"])],
-            y_err_labels=["cs-err"],
-            systematic_norm_err=np.array(
-                data["data"].get("systematic_normalization_error", [])
-            ),
-            systematic_offset_err=np.array(
-                data["data"].get("systematic_offset_error", [])
-            ),
-        )
+        measurements = []
+        for measurement_json in data:
+            measurements.append(
+                AngularDistribution(
+                    Einc=data["energy"],
+                    Einc_err=data.get("energy-err", 0.0),
+                    Einc_units=data["energy-units"],
+                    Ex=data.get("ex-energy", 0.0),
+                    Ex_err=data.get("ex-energy-err", 0.0),
+                    Ex_units=data.get("ex-energy-units", "MeV"),
+                    subentry=data["EXFORAccessionNumber"],
+                    quantity=data_types_json.get(data["type"], "unknown"),
+                    x_units=data["data"]["angle-units"],
+                    y_units=data["data"]["cs-units"],
+                    x=np.array(data["data"]["angle"]),
+                    x_err=np.array(data["data"].get("angle-err", [])),
+                    y=np.array(data["data"]["cs"]),
+                    y_errs=[np.array(data["data"]["cs-err"])],
+                    y_err_labels=["cs-err"],
+                    systematic_norm_err=np.array(
+                        data["data"].get("systematic_normalization_error", [])
+                    ),
+                    systematic_offset_err=np.array(
+                        data["data"].get("systematic_offset_error", [])
+                    ),
+                )
+            )
 
 
 def extract_syserr_labels(
@@ -564,7 +699,7 @@ def sort_subentry_data_by_energy(
 
         if elastic_only:
             measurements.append(
-                AngularDistribution(
+                AngularDistribution.parse_errs_and_init(
                     Einc,
                     Einc_err,
                     Einc_units,
@@ -595,7 +730,7 @@ def sort_subentry_data_by_energy(
                 mask = np.isclose(subset[0, :], Ex)
                 Ex_err = subset[1, mask][0]
                 measurements.append(
-                    AngularDistribution(
+                    AngularDistribution.parse_errs_and_init(
                         Einc,
                         Einc_err,
                         Einc_units,
