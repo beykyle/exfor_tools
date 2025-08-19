@@ -553,35 +553,48 @@ class AngularDistribution(Distribution):
         return json.dumps(data, indent=4)
 
     @classmethod
-    def from_json(cls, json_str: str):
-        data = json.loads(json_str)
+    def from_json(cls, json_file):
+        data = json.load(json_file)
         measurements = []
-        for measurement_json in data:
-            measurements.append(
-                AngularDistribution(
-                    Einc=data["energy"],
-                    Einc_err=data.get("energy-err", 0.0),
-                    Einc_units=data["energy-units"],
-                    Ex=data.get("ex-energy", 0.0),
-                    Ex_err=data.get("ex-energy-err", 0.0),
-                    Ex_units=data.get("ex-energy-units", "MeV"),
-                    subentry=data["EXFORAccessionNumber"],
-                    quantity=data_types_json.get(data["type"], "unknown"),
-                    x_units=data["data"]["angle-units"],
-                    y_units=data["data"]["cs-units"],
-                    x=np.array(data["data"]["angle"]),
-                    x_err=np.array(data["data"].get("angle-err", [])),
-                    y=np.array(data["data"]["cs"]),
-                    y_errs=[np.array(data["data"]["cs-err"])],
-                    y_err_labels=["cs-err"],
-                    systematic_norm_err=np.array(
-                        data["data"].get("systematic_normalization_error", [])
-                    ),
-                    systematic_offset_err=np.array(
-                        data["data"].get("systematic_offset_error", [])
-                    ),
+        for measurement in data:
+            subentry = measurement["EXFORAccessionNumber"]
+            quantity = data_types_json.get(measurement["type"], "unknown")
+            x_units = measurement["data"]["angle-units"]
+            y_units = measurement["data"]["cs-units"]
+            x = np.array(measurement["data"]["angle"])
+            x_err = np.array(measurement["data"].get("angle-err", np.zeros_like(x)))
+            y = np.array(measurement["data"]["cs"])
+            statistical_err = np.array(measurement["data"]["cs-err"])
+            systematic_norm_err = np.array(
+                measurement["data"].get(
+                    "systematic_normalization_error", np.zeros_like(y)
                 )
             )
+            systematic_offset_err = np.array(
+                measurement["data"].get("systematic_offset_error", np.zeros_like(y))
+            )
+
+            measurements.append(
+                AngularDistribution(
+                    measurement["energy"],
+                    measurement.get("energy-err", 0.0),
+                    measurement["energy-units"],
+                    measurement.get("ex-energy", 0.0),
+                    measurement.get("ex-energy-err", 0.0),
+                    measurement.get("ex-energy-units", "MeV"),
+                    subentry,
+                    quantity,
+                    x_units,
+                    y_units,
+                    x,
+                    x_err,
+                    y,
+                    statistical_err,
+                    systematic_norm_err,
+                    systematic_offset_err,
+                )
+            )
+        return measurements
 
 
 def extract_syserr_labels(
