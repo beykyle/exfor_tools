@@ -1,10 +1,11 @@
 import json
 
 import numpy as np
+
 from .parsing import (
     parse_angular_distribution,
-    parse_inc_energy,
     parse_ex_energy,
+    parse_inc_energy,
     unit_symbols,
 )
 
@@ -291,8 +292,7 @@ class Distribution:
             systematic_norm_err = np.sqrt(np.sum(systematic_norm_err**2, axis=0))
         else:
             raise ValueError(
-                "Unknown systematic_err_treatment option:"
-                f" {systematic_err_treatment}"
+                f"Unknown systematic_err_treatment option: {systematic_err_treatment}"
             )
 
         assert statistical_err.shape == (rows,)
@@ -466,7 +466,6 @@ class AngularDistribution(Distribution):
 
         # plot each measurement and add a label
         for offset, m in zip(offsets, measurements):
-
             if not isinstance(m, list):
                 m = [m]
 
@@ -553,10 +552,18 @@ class AngularDistribution(Distribution):
         return json.dumps(data, indent=4)
 
     @classmethod
-    def from_json(cls, json_file):
-        data = json.load(json_file)
+    def from_json(cls, json_data: list):
+        """
+        Constructs a list of AngularDistribution objects from JSON data.
+        Parameters:
+        json_data: list
+            A list of dictionaries containing the JSON data.
+        Returns:
+            list:
+            A list of AngularDistribution objects.
+        """
         measurements = []
-        for measurement in data:
+        for measurement in json_data:
             subentry = measurement["EXFORAccessionNumber"]
             quantity = data_types_json.get(measurement["type"], "unknown")
             x_units = measurement["data"]["angle-units"]
@@ -782,7 +789,6 @@ def set_label(
     label_excitation_energy=False,
     label_exfor=False,
 ):
-
     if label_xloc_deg is None:
         if x[-1] < 60:
             label_xloc_deg = 65
