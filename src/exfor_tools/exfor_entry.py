@@ -3,23 +3,23 @@ Library tools for parsing EXFOR entries
 """
 
 import numpy as np
-
-from x4i3.exfor_reactions import X4Reaction
 from x4i3.exfor_column_parsing import (
     errorSuffix,
     resolutionFWSuffix,
     resolutionHWSuffix,
 )
-from .db import __EXFOR_DB__
+from x4i3.exfor_reactions import X4Reaction
 
-from .parsing import quantity_matches, quantity_symbols
-from .distribution import AngularDistribution
 from . import reaction as rxn
+from .db import __EXFOR_DB__
+from .distribution import AngularDistribution
+from .parsing import quantity_matches, quantity_symbols
 
 
 def attempt_parse_subentry(MeasurementClass, *args, **kwargs):
     failed_parses = {}
     measurements = []
+    measurements = MeasurementClass.parse_subentry(*args, **kwargs)
     try:
         measurements = MeasurementClass.parse_subentry(*args, **kwargs)
     except Exception as e:
@@ -92,7 +92,6 @@ def extract_err_analysis(common_subent):
 
 
 class ExforEntry:
-
     def __init__(
         self,
         entry: str,
@@ -173,7 +172,6 @@ class ExforEntry:
         self.failed_parses = {}
 
         for key, data_set in entry_datasets.items():
-
             if not isinstance(data_set.reaction[0], X4Reaction):
                 # TODO handle ReactionCombinations
                 continue
@@ -189,7 +187,6 @@ class ExforEntry:
                 and filter_subentries(data_set, **filter_kwargs)
                 and rxn.is_match(self.reaction, data_set, self.vocal)
             ):
-
                 measurements, failed_parses = attempt_parse_subentry(
                     MeasurementClass,
                     key[1],

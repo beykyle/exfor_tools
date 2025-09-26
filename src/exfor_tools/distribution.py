@@ -552,18 +552,10 @@ class AngularDistribution(Distribution):
         return json.dumps(data, indent=4)
 
     @classmethod
-    def from_json(cls, json_data: list):
-        """
-        Constructs a list of AngularDistribution objects from JSON data.
-        Parameters:
-        json_data: list
-            A list of dictionaries containing the JSON data.
-        Returns:
-            list:
-            A list of AngularDistribution objects.
-        """
+    def from_json(cls, json_file):
+        data = json.load(json_file)
         measurements = []
-        for measurement in json_data:
+        for measurement in data:
             subentry = measurement["EXFORAccessionNumber"]
             quantity = data_types_json.get(measurement["type"], "unknown")
             x_units = measurement["data"]["angle-units"]

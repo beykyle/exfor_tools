@@ -1,10 +1,10 @@
 from functools import reduce
 
 import numpy as np
-
 from x4i3.exfor_column_parsing import (
     X4ColumnParser,
     X4IndependentColumnPair,
+    X4MissingErrorColumnPair,
     angDistUnits,
     angleParserList,
     baseDataKeys,
@@ -19,9 +19,7 @@ from x4i3.exfor_column_parsing import (
     resolutionFWSuffix,
     resolutionHWSuffix,
     variableSuffix,
-    X4MissingErrorColumnPair,
 )
-
 
 # these are the supported quantities at the moment
 quantity_matches = {
@@ -113,7 +111,6 @@ def parse_differential_data(
     # parse errors
     xs_err = []
     for label in data_error_columns:
-
         # parse error column
         err_parser = X4ColumnParser(
             match_labels=reduce(
@@ -162,10 +159,12 @@ def parse_ex_energy(data_set):
     if missing_Ex:
         return Ex, Ex, None
 
-    if Ex[0][-3:] == "-CM":
-        raise NotImplementedError("Incident energy in CM frame!")
-
     Ex_err = reduce(condenseColumn, [c.getError(data_set) for c in energyExParserList])
+    missing_Ex_err = np.all([a is None for a in Ex_err[2:]])
+    if missing_Ex_err:
+        Ex_err = np.zeros_like(Ex)
+        return Ex, Ex_err, Ex_units
+
     if Ex_err[1] != Ex_units:
         raise ValueError(
             f"Inconsistent units for Ex and Ex error: {Ex_units} and {Ex_err[1]}"
