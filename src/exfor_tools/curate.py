@@ -3,12 +3,11 @@ Library tools for interactively curating data sets from EXFOR
 """
 
 import numpy as np
-
 from matplotlib import pyplot as plt
 
-from .exfor_entry import ExforEntry
 from . import reaction as rxn
 from .distribution import AngularDistribution
+from .exfor_entry import ExforEntry
 from .parsing import quantity_matches, quantity_symbols
 
 
@@ -116,7 +115,7 @@ def categorize_measurement_list(measurements, min_num_pts=5, Einc_tol=0.1):
     return sorted_measurements
 
 
-def categorize_measurements_by_energy(all_entries, min_num_pts=5, Einc_tol=0.1):
+def categorize_measurements_by_energy(all_entries, min_num_pts=1, Einc_tol=0.1):
     r"""
     Given a dictionary form EXFOR entry number to ExforEntry, grabs all
     and sorts them by energy, concatenating ones that are at the same energy
