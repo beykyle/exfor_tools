@@ -176,7 +176,6 @@ class Distribution:
         """
         sort_by_x = x.argsort()
         y_errs = [y_err[sort_by_x] for y_err in y_errs]
-        y_err_labels = y_err_labels
         (
             statistical_err,
             systematic_norm_err,
@@ -220,10 +219,6 @@ class Distribution:
         systematic_err_labels,
         systematic_err_treatment,
     ):
-        for err, label in zip(y_errs, y_err_labels):
-            if np.any(err < 0):
-                raise ValueError(f"negative errors under label {label}!")
-
         if statistical_err_labels is None:
             statistical_err_labels, statistical_err_treatment = extract_staterr_labels(
                 y_err_labels,
@@ -232,28 +227,31 @@ class Distribution:
                 ),
             )
 
-        statistical_err = np.zeros(
-            (len(statistical_err_labels), rows), dtype=np.float64
-        )
+        statistical_err = []
 
         for i, label in enumerate(statistical_err_labels):
-            if label not in y_err_labels:
-                raise ValueError(
-                    f"Did not find error column label {label} in subentry {subentry}"
-                )
-            else:
+            if label in y_err_labels:
                 index = y_err_labels.index(label)
-                statistical_err[i, :] = y_errs[index]
+                statistical_err.append(y_errs[index])
+
+        if statistical_err == []:
+            statistical_err = [np.zeros((rows))]
+        statistical_err = np.array(statistical_err)
 
         if statistical_err_treatment == "independent":
             statistical_err = np.sqrt(np.sum(statistical_err**2, axis=0))
         elif statistical_err_treatment == "difference":
-            statistical_err = -np.diff(statistical_err, axis=0)
+            statistical_err = -np.diff(statistical_err, axis=0)[0, :]
         elif statistical_err_treatment == "sum":
             statistical_err = np.sum(statistical_err, axis=0)
         else:
             raise ValueError(
                 f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
+            )
+
+        if np.any(statistical_err < 0):
+            raise ValueError(
+                f"Negative statistical error found in subentry {subentry}!"
             )
 
         if systematic_err_labels is None:
@@ -268,11 +266,7 @@ class Distribution:
         systematic_norm_err = []
 
         for i, label in enumerate(systematic_err_labels):
-            if label not in y_err_labels:
-                raise ValueError(
-                    f"Did not find error column label {label} in subentry {subentry}"
-                )
-            else:
+            if label in y_err_labels:
                 index = y_err_labels.index(label)
                 err = y_errs[index]
                 ratio = err / y
@@ -656,6 +650,10 @@ def extract_staterr_labels(
     Raises:
     ValueError: If the statistical error labels are ambiguous
     """
+    if "+ERR-T" in labels and "-ERR-T" in labels:
+        return ["+ERR-T", "-ERR-T"], "difference"
+    if "+DATA-ERR" in labels and "+DATA-ERR" in labels:
+        return ["+DATA-ERR", "-DATA-ERR"], "difference"
     allowed_stat_err_combos = set(
         [frozenset([l, "ERR-DIG"]) for l in allowed_stat_errs]
         + [frozenset([l]) for l in allowed_stat_errs | frozenset(["ERR-DIG"])]
