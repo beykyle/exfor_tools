@@ -249,6 +249,8 @@ class Distribution:
             statistical_err = np.sqrt(np.sum(statistical_err**2, axis=0))
         elif statistical_err_treatment == "difference":
             statistical_err = -np.diff(statistical_err, axis=0)
+        elif statistical_err_treatment == "sum":
+            statistical_err = np.sum(statistical_err, axis=0)
         else:
             raise ValueError(
                 f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
