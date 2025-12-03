@@ -185,6 +185,10 @@ def parse_angle(data_set):
         units = "CM-degrees"
     elif angle[0][-3:] == "ANG":
         units = "LAB-degrees"
+    elif angle[0] == "COS-CM":
+        units = "CM-degrees"
+    elif angle[0][-3:] == "COS":
+        units = "LAB-degrees"
     else:
         raise ValueError(
             f"Cannot parse angle frame from {angle[0]}, expected -CM or -LAB suffix"
