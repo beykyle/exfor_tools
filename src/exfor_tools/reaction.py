@@ -1,18 +1,5 @@
-from jitr.reactions import (
-    Reaction,
-    Particle,
-    Gamma,
-    Electron,
-    Positron,
-    Nucleus,
-    ElasticReaction,
-    InelasticReaction,
-    TotalReaction,
-    AbsorptionReaction,
-    InclusiveReaction,
-    GammaCaptureReaction,
-)
 import periodictable
+from jitr.reactions import Reaction
 
 from .db import __EXFOR_DB__
 from .parsing import quantity_matches
@@ -88,6 +75,8 @@ def is_match(reaction: Reaction, subentry, vocal=False):
 
     product = subentry.reaction[0].products[0]
     if isinstance(product, str):
+        if reaction.process is None:
+            return False
         if product != reaction.process.upper():
             return False
     else:

@@ -100,6 +100,7 @@ class ExforEntry:
         Ex_range: tuple = None,
         vocal=False,
         MeasurementClass=None,
+        elastic_only=False,
         parsing_kwargs={},
         filter_kwargs={},
     ):
@@ -114,12 +115,11 @@ class ExforEntry:
             Einc_range = (0, np.inf)
         self.Einc_range = Einc_range
 
-        elastic_only = False
-        if isinstance(reaction, rxn.ElasticReaction):
-            elastic_only = True
-            Ex_range = (0, 0)
-        elif Ex_range is None:
-            Ex_range = (0, np.inf)
+        if Ex_range is None:
+            if elastic_only:
+                Ex_range = (0, 0)
+            else:
+                Ex_range = (0, np.inf)
 
         self.Ex_range = Ex_range
 
