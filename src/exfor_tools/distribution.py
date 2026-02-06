@@ -695,7 +695,6 @@ def sort_subentry_data_by_energy(
         )
         data = data[:, Ex_mask]
         data_err = data_err[:, Ex_mask]
-
     # AngularDistribution objects sorted by incident energy,
     # then excitation energy or just incident enrgy if
     # elastic_only is True
@@ -746,8 +745,8 @@ def sort_subentry_data_by_energy(
                         Einc,
                         Einc_err,
                         Einc_units,
-                        0,
-                        0,
+                        Ex,
+                        Ex_err,
                         Ex_units,
                         subentry,
                         quantity,
