@@ -12,13 +12,14 @@ from x4i3.exfor_reactions import X4Reaction
 
 from . import reaction as rxn
 from .db import __EXFOR_DB__
-from .distribution import AngularDistribution
+from .distribution import AngularDistribution, Distribution, EnergyDistribution
 from .parsing import quantity_matches, quantity_symbols
 
 
 def attempt_parse_subentry(MeasurementClass, *args, **kwargs):
     failed_parses = {}
     measurements = []
+    measurements = MeasurementClass.parse_subentry(*args, **kwargs)
     try:
         measurements = MeasurementClass.parse_subentry(*args, **kwargs)
     except Exception as e:
@@ -30,7 +31,13 @@ def attempt_parse_subentry(MeasurementClass, *args, **kwargs):
     return measurements, dict(failed_parses)
 
 
-def filter_subentries(data_set, filter_lab_angle=True, min_num_pts=4, allow_cos=False):
+def filter_subentries_energy(data_set, min_num_pts=4, **kwargs):
+    return data_set.numrows() >= min_num_pts
+
+
+def filter_subentries_angular(
+    data_set, filter_lab_angle=True, min_num_pts=4, allow_cos=False
+):
     angle_labels = [
         l
         for l in data_set.labels
@@ -96,8 +103,8 @@ class ExforEntry:
         entry: str,
         reaction: rxn.Reaction,
         quantity: str,
-        Einc_range: tuple = None,
-        Ex_range: tuple = None,
+        Einc_range: tuple = (0, np.inf),
+        Ex_range: tuple = (0, np.inf),
         vocal=False,
         MeasurementClass=None,
         elastic_only=False,
@@ -111,16 +118,10 @@ class ExforEntry:
         self.vocal = vocal
         self.entry = entry
         self.reaction = reaction
-        if Einc_range is None:
-            Einc_range = (0, np.inf)
         self.Einc_range = Einc_range
 
-        if Ex_range is None:
-            if elastic_only:
-                Ex_range = (0, 0)
-            else:
-                Ex_range = (0, np.inf)
-
+        if elastic_only:
+            Ex_range = (0, 0)
         self.Ex_range = Ex_range
 
         self.quantity = quantity
@@ -131,8 +132,13 @@ class ExforEntry:
                 or self.quantity == "Ay"
             ):
                 MeasurementClass = AngularDistribution
+                self.filter_subentries = filter_subentries_angular
+            elif self.quantity == "XS":
+                MeasurementClass = EnergyDistribution
+                self.filter_subentries = filter_subentries_energy
             else:
-                raise NotImplementedError()
+                MeasurementClass = Distribution
+
         self.MeasurementClass = MeasurementClass
         self.exfor_quantities = quantity_matches[quantity]
         self.data_symbol = quantity_symbols[tuple(self.exfor_quantities[0])]
@@ -183,7 +189,7 @@ class ExforEntry:
             # matched reaction
             if (
                 quantity in self.exfor_quantities
-                and filter_subentries(data_set, **filter_kwargs)
+                and self.filter_subentries(data_set, **filter_kwargs)
                 and rxn.is_match(self.reaction, data_set, self.vocal)
             ):
                 measurements, failed_parses = attempt_parse_subentry(
@@ -198,8 +204,6 @@ class ExforEntry:
                     vocal=vocal,
                 )
                 for m in measurements:
-                    if m.x.size < filter_kwargs["min_num_pts"]:
-                        continue
                     self.measurements.append(m)
                 for subentry, e in failed_parses.items():
                     self.failed_parses[key[0]] = (subentry, e)

@@ -4,6 +4,7 @@ import numpy as np
 
 from .parsing import (
     parse_angular_distribution,
+    parse_energy_distribution,
     parse_ex_energy,
     parse_inc_energy,
     unit_symbols,
@@ -13,6 +14,7 @@ data_types_json = {
     "ECS": "dXS/dA",
     "APower": "Ay",
     "ECS_Rutherford": "dXS/dRuth",
+    "CS": "XS",
 }
 
 
@@ -311,6 +313,158 @@ class Distribution:
         raise NotImplementedError(
             "Plotting not implemented for base Distribution class."
         )
+
+
+class EnergyDistribution(Distribution):
+    """
+    Represents a quantity as a function of energy, at given incident lab
+    energy and residual excitation energy
+    """
+
+    def __init__(
+        self,
+        *args,
+    ):
+        super().__init__(*args, xbounds=(0, np.inf))
+
+    @classmethod
+    def parse_errs_and_init(
+        cls,
+        *args,
+        **kwargs,
+    ):
+        d = Distribution.parse_errs_and_init(
+            *args,
+            xbounds=(0, np.inf),
+            **kwargs,
+        )
+        return cls(
+            d.subentry,
+            d.quantity,
+            d.x_units,
+            d.y_units,
+            d.x,
+            d.x_err,
+            d.y,
+            d.statistical_err,
+            d.systematic_norm_err,
+            d.systematic_offset_err,
+        )
+
+    @classmethod
+    def parse_subentry(
+        cls,
+        subentry,
+        data_set,
+        quantity: str,
+        parsing_kwargs={},
+        Einc_range=(0, np.inf),
+        Ex_range=(0, np.inf),
+        elastic_only=False,
+        vocal=False,
+    ):
+        r"""
+        Returns a single EnergyDistribution object for the given subentry if
+        it falls within the given energy ranges, otherwise returns an
+        empty list.
+        """
+
+        Einc = parse_inc_energy(data_set)[0]
+        if not np.any(
+            np.logical_and(Einc >= Einc_range[0], Einc <= Einc_range[1]),
+        ):
+            return []
+
+        lbl_frags_to_skip = ["EN", "E-LVL", "E-EXC"]
+        err_labels = [
+            label
+            for label in data_set.labels
+            if "ERR" in label
+            and np.all([frag not in label for frag in lbl_frags_to_skip])
+        ]
+
+        Einc_lab, Einc_lab_err, Ex, Ex_err, xs, data_err, error_columns, units = (
+            parse_energy_distribution(
+                subentry,
+                data_set,
+                data_error_columns=err_labels,
+                vocal=vocal,
+            )
+        )
+        Einc_units, Ex_units, xs_units = units
+
+        return EnergyDistribution.parse_errs_and_init(
+            subentry,
+            quantity,
+            Einc_units,
+            xs_units,
+            Einc_lab,
+            Einc_lab_err,
+            xs,
+            [data_err[:, i] for i in range(data_err.shape[0])],
+            error_columns,
+            **parsing_kwargs,
+        )
+
+    def to_json(self, citation: str = "") -> str:
+        data = {
+            "type": next(
+                (k for k, v in data_types_json.items() if v == self.quantity), "unknown"
+            ),
+            "energy": float(self.Einc),
+            "energy-err": float(self.Einc_err),
+            "energy-units": self.Einc_units,
+            "EXFORAccessionNumber": self.subentry,
+            "source": citation,
+            "data": {
+                "energy": self.x.tolist(),
+                "energy-units": self.x_units,
+                "energy-err": self.x_err.tolist(),
+                "cs": self.y.tolist(),
+                "cs-units": self.y_units,
+                "cs-err": self.statistical_err.tolist(),
+                "systematic_normalization_error": self.systematic_norm_err.tolist(),
+                "systematic_offset_error": self.systematic_offset_err.tolist(),
+            },
+        }
+        return json.dumps(data, indent=4)
+
+    def from_json(cls, json_file):
+        data = json.load(json_file)
+        measurements = []
+        for measurement in data:
+            subentry = measurement["EXFORAccessionNumber"]
+            quantity = data_types_json.get(measurement["type"], "unknown")
+            x_units = measurement["data"]["energy-units"]
+            y_units = measurement["data"]["cs-units"]
+            x = np.array(measurement["data"]["energy"])
+            x_err = np.array(measurement["data"].get("energy-err", np.zeros_like(x)))
+            y = np.array(measurement["data"]["cs"])
+            statistical_err = np.array(measurement["data"]["cs-err"])
+            systematic_norm_err = np.array(
+                measurement["data"].get(
+                    "systematic_normalization_error", np.zeros_like(y)
+                )
+            )
+            systematic_offset_err = np.array(
+                measurement["data"].get("systematic_offset_error", np.zeros_like(y))
+            )
+
+            measurements.append(
+                EnergyDistribution(
+                    subentry,
+                    quantity,
+                    x_units,
+                    y_units,
+                    x,
+                    x_err,
+                    y,
+                    statistical_err,
+                    systematic_norm_err,
+                    systematic_offset_err,
+                )
+            )
+        return measurements
 
 
 class AngularDistribution(Distribution):

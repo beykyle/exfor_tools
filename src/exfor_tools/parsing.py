@@ -9,6 +9,8 @@ from x4i3.exfor_column_parsing import (
     angleParserList,
     baseDataKeys,
     condenseColumn,
+    crossSectionUnits,
+    csDataParserList,
     dataTotalErrorKeys,
     energyUnits,
     errorSuffix,
@@ -26,6 +28,9 @@ quantity_matches = {
     "dXS/dA": [["DA"], ["PAR", "DA"]],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
     "Ay": [["POL/DA", "ANA"]],
+    "XS": [
+        ["SIG"],
+    ],
 }
 quantities = list(quantity_matches.keys())
 
@@ -34,9 +39,10 @@ quantity_symbols = {
     ("DA", "RTH"): r"$\sigma / \sigma_{Rutherford}$",
     ("DA", "RTH/REL"): r"$\sigma / \sigma_{Rutherford}$",
     ("POL/DA", "ANA"): r"$A_y$",
+    ("SIG",): r"$\sigma$",
 }
 
-unit_symbols = {"no-dim": "unitless", "barns/ster": "b/Sr"}
+unit_symbols = {"no-dim": "unitless", "barns/ster": "b/Sr", "barns": "b"}
 energyExParserList = [
     X4MissingErrorColumnPair(
         X4ColumnParser(
@@ -84,6 +90,55 @@ energyExParserList = [
         ),
     ),
 ]
+
+
+def parse_energy_dependent_xs(data_set, data_error_columns=["DATA-ERR"]):
+    r"""
+    Extract energy dependent quantities (e.g. total cross section, polarization)
+    """
+    xs = reduce(condenseColumn, [c.getValue(data_set) for c in csDataParserList])
+    if xs[1] not in crossSectionUnits + noUnits:
+        raise ValueError(
+            f"Cannot parse data column with units {xs[1]}, expected one of {crossSectionUnits + noUnits}"
+        )
+    units = xs[1]
+    xs = np.array(xs[2:], dtype=np.float64)
+
+    # parse errors
+    xs_err = []
+    for label in data_error_columns:
+        # parse error column
+        err_parser = X4ColumnParser(
+            match_labels=reduce(
+                lambda x, y: x + y,
+                [label],
+            ),
+            match_units=crossSectionUnits + percentUnits + noUnits,
+        )
+
+        if label not in data_set.labels:
+            raise ValueError(f"Subentry does not have a column called {label}")
+        else:
+            iyerr = [idx for idx, value in enumerate(data_set.labels) if value == label]
+            if len(iyerr) > 1:
+                raise ValueError(
+                    f"Expected only one {label} column, found {len(iyerr)}"
+                )
+
+            err = err_parser.getColumn(iyerr[0], data_set)
+            err_units = err[1]
+            err_data = np.nan_to_num(np.array(err[2:], dtype=np.float64))
+            # convert to same units as data
+            if "PER-CENT" in err_units:
+                err_data *= xs / 100
+            elif err_units != units:
+                raise ValueError(
+                    f"Attempted to extract error column {err[0]} with incompatible units"
+                    f"{err_units} for data column with units {units}"
+                )
+
+            xs_err.append(err_data)
+    return xs, xs_err, units
 
 
 def parse_differential_data(
@@ -239,6 +294,57 @@ def parse_inc_energy(data_set):
     )
 
     return Einc_lab, Einc_lab_err, Einc_units
+
+
+def parse_energy_distribution(
+    subentry,
+    data_set,
+    data_error_columns=None,
+    vocal=False,
+):
+    r"""
+    Extracts energy differential cross sections, returning incident and
+    product excitation energy in MeV, energies and error in energy in MeV,
+    and differential cross section and its error in mb/MeV all in a numpy array.
+    """
+    if vocal:
+        print(
+            f"Found subentry {subentry} with the following columns:\n{data_set.labels}"
+        )
+
+    if data_error_columns is None:
+        data_error_columns = [b + "-ERR" for b in baseDataKeys] + dataTotalErrorKeys
+
+    try:
+        # parse incident energy if it's present
+        Einc_lab, Einc_lab_err, Einc_units = parse_inc_energy(data_set)
+
+        # parse excitation energy if it's present
+        Ex, Ex_err, Ex_units = parse_ex_energy(data_set)
+
+        # parse diff xs
+        xs, xs_err, xs_units = parse_energy_dependent_xs(
+            data_set, data_error_columns=data_error_columns
+        )
+    except Exception as e:
+        new_exception = type(e)(f"Error while parsing {subentry}: {e}")
+        raise new_exception from e
+
+    if vocal:
+        if len(xs_err) == 0 or np.all([np.allclose(d, 0) for d in xs_err]):
+            print(f"Warning: subentry {subentry} has no reported data errors")
+            xs_err = np.zeros((n_err_cols, N))
+
+    return (
+        Einc_lab,
+        Einc_lab_err,
+        Ex,
+        Ex_err,
+        xs,
+        np.nan_to_num(np.array(xs_err)),
+        data_error_columns,
+        (Einc_units, Ex_units, xs_units),
+    )
 
 
 def parse_angular_distribution(
