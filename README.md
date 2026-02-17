@@ -22,7 +22,7 @@ pip instal exfor_tools -e
 
 ## test
 
-The tests and the tutorials are one and the same. To ensure they run, use:
+The tests and the examples are one and the same. To ensure they run, use:
 
 ```
 pytest --nbmake examples/
@@ -31,10 +31,17 @@ pytest --nbmake examples/
 To ensure they produce the expected results, use:
 
 ```
-pyetst --nbval examples/
+pytest --nbval-lax examples/
 ```
 
-Note that there may be some difference in your installation, e.g. if you're using a different version of the EXFOR database, so the expected results may not be exactly the same as those in the tutorials.
+Note that there may be some difference in your installation, e.g. if you're using a different version of the EXFOR database, so the expected results may not be exactly the same as those in the tutorials. I will attempt to keep the notebooks in `examples/` up to date with new EXFOR releases.
+
+By default, `x4i3` ships with the `2023-04-29` EXFOR release. There are a set of notebooks with stored outputs valid for that release in `examples/examples_2023_release/`. These are used in the github actions. If you haven't updated to a more recent release but you would like to run the test, then simply run:
+
+
+```
+pytest --nbval-lax examples/examples_2023_release/
+```
 
 ## tuorials
 
