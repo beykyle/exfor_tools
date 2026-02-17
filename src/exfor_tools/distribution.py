@@ -393,18 +393,20 @@ class EnergyDistribution(Distribution):
         )
         Einc_units, Ex_units, xs_units = units
 
-        return EnergyDistribution.parse_errs_and_init(
-            subentry,
-            quantity,
-            Einc_units,
-            xs_units,
-            Einc_lab,
-            Einc_lab_err,
-            xs,
-            [data_err[:, i] for i in range(data_err.shape[0])],
-            error_columns,
-            **parsing_kwargs,
-        )
+        return [
+            EnergyDistribution.parse_errs_and_init(
+                subentry,
+                quantity,
+                Einc_units,
+                xs_units,
+                Einc_lab,
+                Einc_lab_err,
+                xs,
+                [data_err[i, :] for i in range(data_err.shape[0])],
+                error_columns,
+                **parsing_kwargs,
+            )
+        ]
 
     def to_json(self, citation: str = "") -> str:
         data = {
@@ -968,12 +970,12 @@ def set_label(
     if label_incident_energy:
         label += f"\n{m.Einc:1.2f}"
         if label_energy_err:
-            label += f" $\pm$ {m.Einc_err:1.2f}"
+            label += r" $\pm$" + f" {m.Einc_err:1.2f}"
         label += f" {m.Einc_units}"
     if label_excitation_energy:
         label += f"\n$E_{{x}} = ${m.Ex:1.2f}"
         if label_energy_err:
-            label += f" $\pm$ {m.Ex_err:1.2f}"
+            label += r" $\pm$" + f" {m.Ex_err:1.2f}"
         label += f" {m.Ex_units}"
     if label_exfor:
         label += "\n"
