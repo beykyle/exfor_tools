@@ -4,12 +4,6 @@
 # exfor-tools
 Some lightweight tools to grab data from the [EXFOR database](https://www-nds.iaea.org/exfor/) using the [x4i3 library](https://github.com/afedynitch/x4i3/), and organize it for visualization and use in model calibration and uncertainty quantification.
 
-## use case
-
-You have a reaction model $f(x,\alpha)$ and you would like to find some data $y(x)$ to constrain the $\alpha$. Here $x$ can be energy, angle, type of reaction, projectile and target, etc.  You would like to do this in a statistically rigorous way, in which you take into account various types of uncertainties, including systematic uncertainties that introduce correlations between $y(x_i)$ and $y(x_j)$. You would also like to do this with large data sets comprised of many different experiments. In other words, you would like to curate a data set $y$ -- composed of reaction observables like differential cross sections -- and have the information required to construct a covariance matrix for it. And you would like it to be sorted into computationally convenient data structures that you can use for visualization, or comparison to your model. You've come to the right place.
-
-
-
 ## scope
 
 Currently, `exfor_tools` supports most reactions in EXFOR, but only a small subset of the observables/quantities. Feel free to contribute! If it doesn't meet your needs check out the project it's built on, which is far more complete: [x4i3](https://github.com/afedynitch/x4i3/).
@@ -26,9 +20,25 @@ git clone git@github.com:beykyle/exfor_tools.git --recurse-submodules
 pip instal exfor_tools -e 
 ```
 
-## examples and tutorials
+## test
 
-Check out the tutorials:
+The tests and the tutorials are one and the same. To ensure they run, use:
+
+```
+pytest --nbmake examples/
+```
+
+To ensure they produce the expected results, use:
+
+```
+pyetst --nbval examples/
+```
+
+Note that there may be some difference in your installation, e.g. if you're using a different version of the EXFOR database, so the expected results may not be exactly the same as those in the tutorials.
+
+## tuorials
+
+You can also run the notebooks in the `examples/` directory manually to see how to use the package. These include:
 -   [examples/introductory_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/introductory_tutorial.ipynb)
 -   [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/dataset_curation_tutorial.ipynb)
 
@@ -51,4 +61,3 @@ echo export X43I_DATAPATH=$X43I_DATAPATH >> ~/.bashrc
 ```
 
 This functionality for modifying the database used by `x4i3` is provided in [x4i3_tools](https://github.com/afedynitch/x4i3_tools), which is included as a submodule.
-
