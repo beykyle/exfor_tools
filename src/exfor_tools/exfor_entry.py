@@ -19,7 +19,6 @@ from .parsing import quantity_matches, quantity_symbols
 def attempt_parse_subentry(MeasurementClass, *args, **kwargs):
     failed_parses = {}
     measurements = []
-    measurements = MeasurementClass.parse_subentry(*args, **kwargs)
     try:
         measurements = MeasurementClass.parse_subentry(*args, **kwargs)
     except Exception as e:

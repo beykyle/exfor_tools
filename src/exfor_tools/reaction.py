@@ -158,6 +158,7 @@ def is_match(reaction: Reaction, subentry, vocal=False):
         return False
 
     product = subentry.reaction[0].products[0]
+
     if isinstance(product, str):
         if reaction.process is None:
             return False
@@ -175,6 +176,13 @@ def is_match(reaction: Reaction, subentry, vocal=False):
             subentry.reaction[0].residual.getA(),
             subentry.reaction[0].residual.getZ(),
         )
+        if reaction.residual is None and reaction.process.upper() in [
+            "EL",
+            "INL",
+            "SCT",
+        ]:
+            return residual == reaction.target
+
         return residual == reaction.residual
 
 
