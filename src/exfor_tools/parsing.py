@@ -185,8 +185,17 @@ def parse_differential_data(
                 )
 
             err = err_parser.getColumn(iyerr[0], data_set)
+            if np.all([x is None for x in err]):
+                continue
+
             err_units = err[1]
+            if err_units is None:
+                raise ValueError(
+                    f"no units given for error column {err[0]}"
+                )
+
             err_data = np.nan_to_num(np.array(err[2:], dtype=np.float64))
+
             # convert to same units as data
             if "PER-CENT" in err_units:
                 err_data *= xs / 100
