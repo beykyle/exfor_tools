@@ -20,15 +20,37 @@ git clone git@github.com:beykyle/exfor_tools.git --recurse-submodules
 pip instal exfor_tools -e 
 ```
 
+## tuorials
+
+You can run the notebooks in the `examples/` directory to see how to use the package. To run the notebooks, some additional dependencies are required:
+
+```
+pip install -r examples/requirements.txt
+```
+
+The examples include:
+-   [examples/introductory_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/introductory_tutorial.ipynb)
+-   [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/dataset_curation_tutorial.ipynb)
+
+These demonstrate how to query for and parse exfor entries, and curate and plot data sets. In the first one, you will produce this figure: 
+
+![](https://github.com/beykyle/exfor_tools/blob/main/assets/lead_208_pp_dxds.png)
+
 ## test
 
-The tests and the examples are one and the same. To ensure they run, use:
+The tests and the examples are one and the same. To run the tests, first install the dependencies for the notebooks:
+
+```
+pip install -r examples/requirements.txt
+```
+
+Then, to test that the notebooks run, use:
 
 ```
 pytest --nbmake examples/
 ```
 
-To ensure they produce the expected results, use:
+To test that they produce the expected results, use:
 
 ```
 pytest --nbval-lax examples/
@@ -43,15 +65,6 @@ By default, `x4i3` ships with the `2023-04-29` EXFOR release. There are a set of
 pytest --nbval-lax examples/examples_2023_release/
 ```
 
-## tuorials
-
-You can also run the notebooks in the `examples/` directory manually to see how to use the package. These include:
--   [examples/introductory_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/introductory_tutorial.ipynb)
--   [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/dataset_curation_tutorial.ipynb)
-
-These demonstrate how to query for and parse exfor entries, and curate and plot data sets. In the first one, you will produce this figure: 
-
-![](https://github.com/beykyle/exfor_tools/blob/main/assets/lead_208_pp_dxds.png)
 
 ## updating the EXFOR data base
 

@@ -1,0 +1,5 @@
+exfor_tools
+jitr>=2.5.1
+nbmake
+nbval
+pytest
