@@ -63,4 +63,4 @@ jobs:
     - name: run jupyter notebook tests
       run: |
         python -m pip install pytest nbmake jupyter 
-        pytest --nbval-lax examples/examples_2023_release/
+        pytest --nbval-lax examples/examples_2023_release/ -v
