@@ -4,6 +4,18 @@
 # slurm files
 *.slurm
 
+# figures and graphic outputs
+*.png
+*.jpg
+*.jpeg
+
+# tar and zip files
+*.tar
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
