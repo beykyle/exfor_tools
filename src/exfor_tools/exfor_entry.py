@@ -30,7 +30,7 @@ def attempt_parse_subentry(MeasurementClass, *args, **kwargs):
     return measurements, dict(failed_parses)
 
 
-def filter_subentries_energy(data_set, min_num_pts=4, **kwargs):
+def filter_subentries_energy(data_set, min_num_pts=1, **kwargs):
     return data_set.numrows() >= min_num_pts
 
 
@@ -111,9 +111,6 @@ class ExforEntry:
         filter_kwargs={},
     ):
         r""" """
-        if "min_num_pts" not in filter_kwargs:
-            filter_kwargs["min_num_pts"] = 4
-
         self.vocal = vocal
         self.entry = entry
         self.reaction = reaction
