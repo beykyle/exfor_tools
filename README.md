@@ -20,7 +20,7 @@ git clone git@github.com:beykyle/exfor_tools.git --recurse-submodules
 pip instal exfor_tools -e 
 ```
 
-## tuorials
+## tutorials
 
 You can run the notebooks in the `examples/` directory to see how to use the package. To run the notebooks, some additional dependencies are required:
 
