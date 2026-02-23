@@ -430,13 +430,13 @@ class EnergyDistribution(Distribution):
             data["data"]["x_err"] = self.x_err.tolist()
 
         if not np.allclose(self.systematic_norm_err, 0):
-            data["data"]["systematic_normalization_error"] = (
-                self.systematic_norm_err.tolist()
-            )
+            data["data"][
+                "systematic_normalization_error"
+            ] = self.systematic_norm_err.tolist()
         if not np.allclose(self.systematic_offset_err, 0):
-            data["data"]["systematic_offset_error"] = (
-                self.systematic_offset_err.tolist()
-            )
+            data["data"][
+                "systematic_offset_error"
+            ] = self.systematic_offset_err.tolist()
 
         return pd.DataFrame([data])
 
@@ -731,13 +731,13 @@ class AngularDistribution(Distribution):
             data["data"]["x_err"] = self.x_err.tolist()
 
         if not np.allclose(self.systematic_norm_err, 0):
-            data["data"]["systematic_normalization_error"] = (
-                self.systematic_norm_err.tolist()
-            )
+            data["data"][
+                "systematic_normalization_error"
+            ] = self.systematic_norm_err.tolist()
         if not np.allclose(self.systematic_offset_err, 0):
-            data["data"]["systematic_offset_error"] = (
-                self.systematic_offset_err.tolist()
-            )
+            data["data"][
+                "systematic_offset_error"
+            ] = self.systematic_offset_err.tolist()
 
         return pd.DataFrame([data])
 
