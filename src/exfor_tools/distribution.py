@@ -1,6 +1,5 @@
-import json
-
 import numpy as np
+import pandas as pd
 
 from .parsing import (
     parse_angular_distribution,
@@ -408,52 +407,74 @@ class EnergyDistribution(Distribution):
             )
         ]
 
-    def to_json(self, citation: str = "") -> str:
+    def to_dataframe(self, citation: str = "") -> pd.DataFrame:
+        """
+        Converts the EnergyDistribution object to a DataFrame with a specific format for
+        storage or further processing. The DataFrame includes metadata about the distribution,
+        such as the type of quantity, units, and errors.
+        """
         data = {
-            "type": next(
-                (k for k, v in data_types_json.items() if v == self.quantity), "unknown"
-            ),
-            "energy": float(self.Einc),
-            "energy-err": float(self.Einc_err),
-            "energy-units": self.Einc_units,
+            "type": "CS",
             "EXFORAccessionNumber": self.subentry,
             "source": citation,
+            "x_units": self.x_units,
+            "y_units": self.y_units,
             "data": {
-                "energy": self.x.tolist(),
-                "energy-units": self.x_units,
-                "energy-err": self.x_err.tolist(),
-                "cs": self.y.tolist(),
-                "cs-units": self.y_units,
-                "cs-err": self.statistical_err.tolist(),
-                "systematic_normalization_error": self.systematic_norm_err.tolist(),
-                "systematic_offset_error": self.systematic_offset_err.tolist(),
+                "x": self.x.tolist(),
+                "y": self.y.tolist(),
+                "y_err": self.statistical_err.tolist(),
             },
         }
-        return json.dumps(data, indent=4)
 
-    def from_json(cls, json_file):
-        data = json.load(json_file)
+        if not np.allclose(self.x_err, 0):
+            data["data"]["x_err"] = self.x_err.tolist()
+
+        if not np.allclose(self.systematic_norm_err, 0):
+            data["data"]["systematic_normalization_error"] = (
+                self.systematic_norm_err.tolist()
+            )
+        if not np.allclose(self.systematic_offset_err, 0):
+            data["data"]["systematic_offset_error"] = (
+                self.systematic_offset_err.tolist()
+            )
+
+        return pd.DataFrame([data])
+
+    @classmethod
+    def from_dataframe(cls, dataframe: pd.DataFrame):
+        """
+        Creates a list of EnergyDistribution objects from a DataFrame.
+        """
         measurements = []
-        for measurement in data:
-            subentry = measurement["EXFORAccessionNumber"]
-            quantity = data_types_json.get(measurement["type"], "unknown")
-            x_units = measurement["data"]["energy-units"]
-            y_units = measurement["data"]["cs-units"]
-            x = np.array(measurement["data"]["energy"])
-            x_err = np.array(measurement["data"].get("energy-err", np.zeros_like(x)))
-            y = np.array(measurement["data"]["cs"])
-            statistical_err = np.array(measurement["data"]["cs-err"])
-            systematic_norm_err = np.array(
-                measurement["data"].get(
-                    "systematic_normalization_error", np.zeros_like(y)
+        for _, row in dataframe.iterrows():
+            subentry = row["EXFORAccessionNumber"]
+            quantity = data_types_json.get(row["type"], "unknown")
+            x_units = row["x_units"]
+            y_units = row["y_units"]
+
+            x = np.array(row["data"]["x"])
+            y = np.array(row["data"]["y"])
+            statistical_err = np.array(row["data"]["y_err"])
+
+            if "x_err" in row["data"]:
+                x_err = np.array(row["data"]["x_err"])
+            else:
+                x_err = np.zeros_like(x)
+
+            if "systematic_normalization_error" in row["data"]:
+                systematic_norm_err = np.array(
+                    row["data"]["systematic_normalization_error"]
                 )
-            )
-            systematic_offset_err = np.array(
-                measurement["data"].get("systematic_offset_error", np.zeros_like(y))
-            )
+            else:
+                systematic_norm_err = np.zeros_like(y)
+
+            if "systematic_offset_error" in row["data"]:
+                systematic_offset_err = np.array(row["data"]["systematic_offset_error"])
+            else:
+                systematic_offset_err = np.zeros_like(y)
 
             measurements.append(
-                EnergyDistribution(
+                cls(
                     subentry,
                     quantity,
                     x_units,
@@ -677,62 +698,104 @@ class AngularDistribution(Distribution):
 
         return offsets
 
-    def to_json(self, citation: str = "") -> str:
+    def to_dataframe(self, citation: str = "") -> pd.DataFrame:
+        """
+        Converts the AngularDistribution object to a DataFrame with a specific format for
+        storage or further processing. The DataFrame includes metadata about the distribution,
+        such as the type of quantity, energy, units, and errors.
+        """
         data = {
             "type": next(
                 (k for k, v in data_types_json.items() if v == self.quantity), "unknown"
             ),
             "energy": float(self.Einc),
-            "energy-err": float(self.Einc_err),
-            "ex-energy": float(self.Ex),
-            "ex-energy-err": float(self.Ex_err),
-            "ex-energy-units": self.Ex_units,
-            "energy-units": self.Einc_units,
+            "energy_err": float(self.Einc_err),
+            "energy_units": self.Einc_units,
             "EXFORAccessionNumber": self.subentry,
             "source": citation,
+            "x_units": self.x_units,
+            "y_units": self.y_units,
             "data": {
-                "angle": self.x.tolist(),
-                "angle-units": self.x_units,
-                "angle-err": self.x_err.tolist(),
-                "cs": self.y.tolist(),
-                "cs-units": self.y_units,
-                "cs-err": self.statistical_err.tolist(),
-                "systematic_normalization_error": self.systematic_norm_err.tolist(),
-                "systematic_offset_error": self.systematic_offset_err.tolist(),
+                "x": self.x.tolist(),
+                "y": self.y.tolist(),
+                "y_err": self.statistical_err.tolist(),
             },
         }
-        return json.dumps(data, indent=4)
+
+        if self.Ex != 0 or self.Ex_err != 0:
+            data["ex_energy"] = float(self.Ex)
+            data["ex_energy_err"] = float(self.Ex_err)
+            data["ex_energy_units"] = self.Ex_units
+
+        if not np.allclose(self.x_err, 0):
+            data["data"]["x_err"] = self.x_err.tolist()
+
+        if not np.allclose(self.systematic_norm_err, 0):
+            data["data"]["systematic_normalization_error"] = (
+                self.systematic_norm_err.tolist()
+            )
+        if not np.allclose(self.systematic_offset_err, 0):
+            data["data"]["systematic_offset_error"] = (
+                self.systematic_offset_err.tolist()
+            )
+
+        return pd.DataFrame([data])
 
     @classmethod
-    def from_json(cls, json_file):
-        data = json.load(json_file)
+    def from_dataframe(cls, dataframe: pd.DataFrame):
+        """Creates a list of AngularDistribution objects from a DataFrame."""
         measurements = []
-        for measurement in data:
-            subentry = measurement["EXFORAccessionNumber"]
-            quantity = data_types_json.get(measurement["type"], "unknown")
-            x_units = measurement["data"]["angle-units"]
-            y_units = measurement["data"]["cs-units"]
-            x = np.array(measurement["data"]["angle"])
-            x_err = np.array(measurement["data"].get("angle-err", np.zeros_like(x)))
-            y = np.array(measurement["data"]["cs"])
-            statistical_err = np.array(measurement["data"]["cs-err"])
-            systematic_norm_err = np.array(
-                measurement["data"].get(
-                    "systematic_normalization_error", np.zeros_like(y)
+        for _, row in dataframe.iterrows():
+            subentry = row["EXFORAccessionNumber"]
+            quantity = data_types_json.get(row["type"], "unknown")
+            x_units = row["x_units"]
+            y_units = row["y_units"]
+            energy = float(row["energy"])
+            energy_err = float(row["energy_err"])
+            energy_units = row["energy_units"]
+
+            x = np.array(row["data"]["x"])
+            y = np.array(row["data"]["y"])
+            statistical_err = np.array(row["data"]["y_err"])
+
+            if "x_err" in row["data"]:
+                x_err = np.array(row["data"]["x_err"])
+            else:
+                x_err = np.zeros_like(x)
+
+            if "systematic_normalization_error" in row["data"]:
+                systematic_norm_err = np.array(
+                    row["data"]["systematic_normalization_error"]
                 )
-            )
-            systematic_offset_err = np.array(
-                measurement["data"].get("systematic_offset_error", np.zeros_like(y))
-            )
+            else:
+                systematic_norm_err = np.zeros_like(y)
+
+            if "systematic_offset_error" in row["data"]:
+                systematic_offset_err = np.array(row["data"]["systematic_offset_error"])
+            else:
+                systematic_offset_err = np.zeros_like(y)
+
+            if (
+                "ex_energy" in row
+                and "ex_energy_err" in row
+                and "ex_energy_units" in row
+            ):
+                Ex = float(row["ex_energy"])
+                Ex_err = float(row["ex_energy_err"])
+                Ex_units = row["ex_energy_units"]
+            else:
+                Ex = 0.0
+                Ex_err = 0.0
+                Ex_units = "MeV"
 
             measurements.append(
                 AngularDistribution(
-                    measurement["energy"],
-                    measurement.get("energy-err", 0.0),
-                    measurement["energy-units"],
-                    measurement.get("ex-energy", 0.0),
-                    measurement.get("ex-energy-err", 0.0),
-                    measurement.get("ex-energy-units", "MeV"),
+                    energy,
+                    energy_err,
+                    energy_units,
+                    Ex,
+                    Ex_err,
+                    Ex_units,
                     subentry,
                     quantity,
                     x_units,
@@ -745,6 +808,7 @@ class AngularDistribution(Distribution):
                     systematic_offset_err,
                 )
             )
+
         return measurements
 
 
