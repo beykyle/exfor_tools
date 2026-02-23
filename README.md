@@ -22,15 +22,19 @@ pip instal exfor_tools -e
 
 ## tutorials
 
-You can run the notebooks in the `examples/` directory to see how to use the package. To run the notebooks, some additional dependencies are required:
+You can run the notebooks in the `examples/` directory to see how to use the package. 
+
+To run the notebooks, some additional dependencies are required:
 
 ```
 pip install -r examples/requirements.txt
 ```
 
+There are two directories in `examples/`: `examples/examples_2025_release/` and `examples/examples_2023_release/`. The former contains notebooks with stored outputs valid for the latest EXFOR release, while the latter contains notebooks with stored outputs valid for the `2023-04-29` release. You can run either one, the only difference is the stored outputs (which are used for testing).
+
 The examples include:
--   [examples/introductory_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/introductory_tutorial.ipynb)
--   [examples/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/dataset_curation_tutorial.ipynb)
+-   [examples/examples_2025_release/introductory_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/examples_2025_release/introductory_tutorial.ipynb)
+-   [examples/examples_2025_release/data_curation_tutorial.ipynb](https://github.com/beykyle/exfor_tools/blob/main/examples/examples_2025_release/dataset_curation_tutorial.ipynb)
 
 These demonstrate how to query for and parse exfor entries, and curate and plot data sets. In the first one, you will produce this figure: 
 
@@ -47,18 +51,18 @@ pip install -r examples/requirements.txt
 Then, to test that the notebooks run, use:
 
 ```
-pytest --nbmake examples/
+pytest --nbmake examples/examples_2025_release/
 ```
 
 To test that they produce the expected results, use:
 
 ```
-pytest --nbval-lax examples/
+pytest --nbval-lax examples/examples_2025_release/
 ```
 
-Note that there may be some difference in your installation, e.g. if you're using a different version of the EXFOR database, so the expected results may not be exactly the same as those in the tutorials. I will attempt to keep the notebooks in `examples/` up to date with new EXFOR releases.
+Note that there may be some difference in your installation, e.g. if you're using a different version of the EXFOR database, so the expected results may not be exactly the same as those in the tutorials. 
 
-By default, `x4i3` ships with the `2023-04-29` EXFOR release. There are a set of notebooks with stored outputs valid for that release in `examples/examples_2023_release/`. These are used in the github actions. If you haven't updated to a more recent release but you would like to run the test, then simply run:
+By default, `x4i3` ships with the `2023-04-29` EXFOR release. There are a set of notebooks with stored outputs valid for that release in `examples/examples_2023_release/`. These are used in the github actions. If you haven't updated to a more recent release but you would like to run the tests, then simply run:
 
 
 ```
