@@ -127,6 +127,7 @@ class ExforEntry:
                 self.quantity == "dXS/dA"
                 or self.quantity == "dXS/dRuth"
                 or self.quantity == "Ay"
+                or self.quantity == "Q"
             ):
                 MeasurementClass = AngularDistribution
                 self.filter_subentries = filter_subentries_angular

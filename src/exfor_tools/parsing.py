@@ -28,6 +28,7 @@ quantity_matches = {
     "dXS/dA": [["DA"], ["PAR", "DA"]],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
     "Ay": [["POL/DA", "ANA"]],
+    "Q": [["POL/DA", "SRF"]],
     "XS": [
         ["SIG"],
     ],
@@ -39,6 +40,7 @@ quantity_symbols = {
     ("DA", "RTH"): r"$\sigma / \sigma_{Rutherford}$",
     ("DA", "RTH/REL"): r"$\sigma / \sigma_{Rutherford}$",
     ("POL/DA", "ANA"): r"$A_y$",
+    ("POL/DA", "SRF"): r"$Q$",
     ("SIG",): r"$\sigma$",
 }
 
