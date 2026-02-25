@@ -32,15 +32,30 @@ class Reaction:
                 f"{get_latex(*self.target)}({get_latex(*self.projectile)},"
                 + f"{self.process.lower()})"
             )
+            self.reaction_string = (
+                f"{get_exfor_particle_symbol(*self.target)}"
+                f"({get_exfor_particle_symbol(*self.projectile)},{self.process.lower()})"
+            )
         elif self.residual is None:
             self.reaction_latex = (
                 f"{get_latex(*self.target)}({get_latex(*self.projectile)},"
                 + f"{get_latex(*self.product)})"
             )
+            self.reaction_string = (
+                f"{get_exfor_particle_symbol(*self.target)}"
+                f"({get_exfor_particle_symbol(*self.projectile)},"
+                f"{get_exfor_particle_symbol(*self.product)})f"
+            )
         else:
             self.reaction_latex = (
                 f"{get_latex(*self.target)}({get_latex(*self.projectile)},"
                 + f"{get_latex(*self.product)}){get_latex(*self.residual)}"
+            )
+            self.reaction_string = (
+                f"{get_exfor_particle_symbol(*self.target)}"
+                f"({get_exfor_particle_symbol(*self.projectile)},"
+                f"{get_exfor_particle_symbol(*self.product)})f"
+                f"{get_exfor_particle_symbol(*self.residual)}"
             )
 
     def __str__(self):
