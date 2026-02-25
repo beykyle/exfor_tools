@@ -11,6 +11,7 @@ from x4i3.exfor_column_parsing import (
 from x4i3.exfor_reactions import X4Reaction
 
 from . import reaction as rxn
+from .bibtex import bibtex_article_from_x4bibmetadata
 from .db import __EXFOR_DB__
 from .distribution import AngularDistribution, Distribution, EnergyDistribution
 from .parsing import quantity_matches, quantity_symbols
@@ -203,6 +204,12 @@ class ExforEntry:
                     self.measurements.append(m)
                 for subentry, e in failed_parses.items():
                     self.failed_parses[key[0]] = (subentry, e)
+
+    def bibtex(self):
+        if self.meta is None:
+            return None
+        else:
+            return bibtex_article_from_x4bibmetadata(self.meta)
 
     def plot(
         self,
