@@ -37,9 +37,10 @@ class Distribution:
         y_errs (list): List of y error arrays.
         y_err_labels (str): Labels for y errors.
         rows (int): Number of data points.
-        statistical_err (np.ndarray): Statistical errors.
-        systematic_offset_err (np.ndarray): Systematic offset errors.
-        systematic_norm_err (np.ndarray): Systematic normalization errors.
+        statistical_err (float): Statistical errors.
+        systematic_offset_err (float): Systematic offset errors.
+        systematic_norm_err (float): Systematic normalization errors.
+        other_fields (dict): any other optional fields,
     """
 
     def __init__(
@@ -52,8 +53,9 @@ class Distribution:
         x_err: np.ndarray,
         y: np.ndarray,
         statistical_err: np.ndarray,
-        systematic_norm_err: np.ndarray,
-        systematic_offset_err: np.ndarray,
+        systematic_norm_err: float,
+        systematic_offset_err: float,
+        other_fields: dict = {},
         xbounds=(-np.inf, np.inf),
     ):
         """
@@ -76,10 +78,12 @@ class Distribution:
                 Array of y values.
             statistical_err: np.ndarray
                 Statistical errors.
-            systematic_norm_err: np.ndarray
-                Systematic normalization errors.
-            systematic_offset_err: np.ndarray
-                Systematic offset errors.
+            systematic_norm_err:  float
+                Systematic normalization error
+            systematic_offset_err: float
+                Systematic offset error
+            other_fields: dict
+                any other optional fields,
             xbounds: tuple, optional
                 Bounds for x values. Defaults to (-np.inf, np.inf).
         """
@@ -103,9 +107,10 @@ class Distribution:
 
         self.notes = []
 
-        self.statistical_err = statistical_err[sort_by_x]
-        self.systematic_norm_err = systematic_norm_err[sort_by_x]
-        self.systematic_offset_err = systematic_offset_err[sort_by_x]
+        self.statistical_err = statistical_err
+        self.systematic_norm_err = systematic_norm_err
+        self.systematic_offset_err = systematic_offset_err
+        self.other_fields = other_fields
 
     @classmethod
     def parse_errs_and_init(
@@ -205,6 +210,7 @@ class Distribution:
             statistical_err,
             systematic_norm_err,
             systematic_offset_err,
+            other_fields={label: field for label, field in zip(y_err_labels, y_errs)},
             xbounds=xbounds,
         )
 
@@ -272,29 +278,24 @@ class Distribution:
                 err = y_errs[index]
                 ratio = err / y
                 if np.allclose(err, err[0]):
-                    systematic_offset_err.append(err)
-                else:
-                    systematic_norm_err.append(ratio)
+                    systematic_offset_err.append(err[0])
+                elif np.allclose(ratio, ratio[0]):
+                    systematic_norm_err.append(ratio[0])
 
         if systematic_norm_err == []:
-            systematic_norm_err = [np.zeros((rows))]
+            systematic_norm_err = 0
         if systematic_offset_err == []:
-            systematic_offset_err = [np.zeros((rows))]
-
-        systematic_norm_err = np.array(systematic_norm_err)
-        systematic_offset_err = np.array(systematic_offset_err)
+            systematic_offset_err = 0
 
         if systematic_err_treatment == "independent":
-            systematic_offset_err = np.sqrt(np.sum(systematic_offset_err**2, axis=0))
-            systematic_norm_err = np.sqrt(np.sum(systematic_norm_err**2, axis=0))
+            systematic_offset_err = np.sqrt(np.sum(np.array(systematic_offset_err)**2))
+            systematic_norm_err = np.sqrt(np.sum(np.array(systematic_norm_err)**2))
         else:
             raise ValueError(
                 f"Unknown systematic_err_treatment option: {systematic_err_treatment}"
             )
 
         assert statistical_err.shape == (rows,)
-        assert systematic_norm_err.shape == (rows,)
-        assert systematic_offset_err.shape == (rows,)
 
         return (
             statistical_err,
@@ -348,6 +349,7 @@ class EnergyDistribution(Distribution):
             d.statistical_err,
             d.systematic_norm_err,
             d.systematic_offset_err,
+            d.other_fields,
         )
 
     @classmethod
@@ -430,13 +432,11 @@ class EnergyDistribution(Distribution):
             data["data"]["x_err"] = self.x_err.tolist()
 
         if not np.allclose(self.systematic_norm_err, 0):
-            data["data"][
-                "systematic_normalization_error"
-            ] = self.systematic_norm_err.tolist()
+            data["data"]["systematic_normalization_error"] = float(
+                self.systematic_norm_err
+            )
         if not np.allclose(self.systematic_offset_err, 0):
-            data["data"][
-                "systematic_offset_error"
-            ] = self.systematic_offset_err.tolist()
+            data["data"]["systematic_offset_error"] = float(self.systematic_offset_err)
 
         return pd.DataFrame([data])
 
@@ -462,16 +462,21 @@ class EnergyDistribution(Distribution):
                 x_err = np.zeros_like(x)
 
             if "systematic_normalization_error" in row["data"]:
-                systematic_norm_err = np.array(
+                systematic_norm_err = float(
                     row["data"]["systematic_normalization_error"]
                 )
             else:
-                systematic_norm_err = np.zeros_like(y)
+                systematic_norm_err = 0
 
             if "systematic_offset_error" in row["data"]:
-                systematic_offset_err = np.array(row["data"]["systematic_offset_error"])
+                systematic_offset_err = float(row["data"]["systematic_offset_error"])
             else:
-                systematic_offset_err = np.zeros_like(y)
+                systematic_offset_err = 0
+
+            other_fields = {}
+            if "other_fields" in row["data"]:
+                for key, field in row["data"]["other_fields"]:
+                    other_fields[key] = np.array(field)
 
             measurements.append(
                 cls(
@@ -485,6 +490,7 @@ class EnergyDistribution(Distribution):
                     statistical_err,
                     systematic_norm_err,
                     systematic_offset_err,
+                    other_fields,
                 )
             )
         return measurements
@@ -548,6 +554,7 @@ class AngularDistribution(Distribution):
             d.statistical_err,
             d.systematic_norm_err,
             d.systematic_offset_err,
+            d.other_fields,
         )
 
     @classmethod
@@ -731,13 +738,11 @@ class AngularDistribution(Distribution):
             data["data"]["x_err"] = self.x_err.tolist()
 
         if not np.allclose(self.systematic_norm_err, 0):
-            data["data"][
-                "systematic_normalization_error"
-            ] = self.systematic_norm_err.tolist()
+            data["data"]["systematic_normalization_error"] = float(
+                self.systematic_norm_err
+            )
         if not np.allclose(self.systematic_offset_err, 0):
-            data["data"][
-                "systematic_offset_error"
-            ] = self.systematic_offset_err.tolist()
+            data["data"]["systematic_offset_error"] = float(self.systematic_offset_err)
 
         return pd.DataFrame([data])
 
@@ -764,16 +769,16 @@ class AngularDistribution(Distribution):
                 x_err = np.zeros_like(x)
 
             if "systematic_normalization_error" in row["data"]:
-                systematic_norm_err = np.array(
+                systematic_norm_err = float(
                     row["data"]["systematic_normalization_error"]
                 )
             else:
-                systematic_norm_err = np.zeros_like(y)
+                systematic_norm_err = 0
 
             if "systematic_offset_error" in row["data"]:
-                systematic_offset_err = np.array(row["data"]["systematic_offset_error"])
+                systematic_offset_err = float(row["data"]["systematic_offset_error"])
             else:
-                systematic_offset_err = np.zeros_like(y)
+                systematic_offset_err = 0
 
             if (
                 "ex_energy" in row
@@ -787,6 +792,11 @@ class AngularDistribution(Distribution):
                 Ex = 0.0
                 Ex_err = 0.0
                 Ex_units = "MeV"
+
+            other_fields = {}
+            if "other_fields" in row["data"]:
+                for key, field in row["data"]["other_fields"]:
+                    other_fields[key] = np.array(field)
 
             measurements.append(
                 AngularDistribution(
@@ -806,6 +816,7 @@ class AngularDistribution(Distribution):
                     statistical_err,
                     systematic_norm_err,
                     systematic_offset_err,
+                    other_fields,
                 )
             )
 
