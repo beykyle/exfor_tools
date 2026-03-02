@@ -288,8 +288,10 @@ class Distribution:
             systematic_offset_err = 0
 
         if systematic_err_treatment == "independent":
-            systematic_offset_err = np.sqrt(np.sum(np.array(systematic_offset_err)**2))
-            systematic_norm_err = np.sqrt(np.sum(np.array(systematic_norm_err)**2))
+            systematic_offset_err = np.sqrt(
+                np.sum(np.array(systematic_offset_err) ** 2)
+            )
+            systematic_norm_err = np.sqrt(np.sum(np.array(systematic_norm_err) ** 2))
         else:
             raise ValueError(
                 f"Unknown systematic_err_treatment option: {systematic_err_treatment}"
