@@ -26,7 +26,24 @@ from x4i3.exfor_column_parsing import (
 
 # these are the supported quantities at the moment
 quantity_matches = {
-    "dXS/dA": [["DA"], ["PAR", "DA"]],
+    # EXFOR qualifies the differential cross section in several ways that do not change
+    # what the observable is. "AV" is averaged over an energy interval (the subentry
+    # carries EN-MEAN); "DERIV" is derived from a measured quantity rather than
+    # tabulated directly; "EXL" and "DI"/"MSC" appear on data whose reaction string is
+    # plain elastic scattering, or scattering with an unresolved low-lying level -- the
+    # "pseudo-elastic" case the KDUQ corpus notes describe as having been analyzed as
+    # elastic. All are matched; the reaction match still requires the right target,
+    # projectile and process.
+    "dXS/dA": [
+        ["DA"],
+        ["PAR", "DA"],
+        ["DA", "AV"],
+        ["PAR", "DA", "AV"],
+        ["DA", "DERIV"],
+        ["EXL", "DA"],
+        ["DI", "DA"],
+        ["DI", "DA", "MSC"],
+    ],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
     # EXFOR tabulates the analyzing power under several codes. "POL/DA,ANA" is the
     # modern one; a bare "POL/DA" is the outgoing-particle polarization, which equals
@@ -37,6 +54,7 @@ quantity_matches = {
     "Q": [["POL/DA", "SRF"]],
     "XS": [
         ["SIG"],
+        ["SIG", "AV"],
     ],
 }
 quantities = list(quantity_matches.keys())
