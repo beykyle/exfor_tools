@@ -28,7 +28,12 @@ from x4i3.exfor_column_parsing import (
 quantity_matches = {
     "dXS/dA": [["DA"], ["PAR", "DA"]],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
-    "Ay": [["POL/DA", "ANA"]],
+    # EXFOR tabulates the analyzing power under several codes. "POL/DA,ANA" is the
+    # modern one; a bare "POL/DA" is the outgoing-particle polarization, which equals
+    # the analyzing power for elastic scattering by time-reversal invariance; and
+    # "POL/DA,ASY" is the measured asymmetry, which is the analyzing power once the
+    # beam polarization is divided out. Older entries use the latter two.
+    "Ay": [["POL/DA", "ANA"], ["POL/DA"], ["POL/DA", "ASY"]],
     "Q": [["POL/DA", "SRF"]],
     "XS": [
         ["SIG"],
