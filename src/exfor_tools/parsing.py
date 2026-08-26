@@ -26,14 +26,14 @@ from x4i3.exfor_column_parsing import (
 
 # these are the supported quantities at the moment
 quantity_matches = {
-    # EXFOR qualifies the differential cross section in several ways that do not change
-    # what the observable is. "AV" is averaged over an energy interval (the subentry
-    # carries EN-MEAN); "DERIV" is derived from a measured quantity rather than
-    # tabulated directly; "EXL" and "DI"/"MSC" appear on data whose reaction string is
-    # plain elastic scattering, or scattering with an unresolved low-lying level -- the
-    # "pseudo-elastic" case the KDUQ corpus notes describe as having been analyzed as
-    # elastic. All are matched; the reaction match still requires the right target,
-    # projectile and process.
+    # EXFOR qualifies the differential cross section in several ways that leave it a
+    # differential cross section. Per the EXFOR dictionary: "AV" is an average (the
+    # subentry carries EN-MEAN), "DERIV" is derived data, "DI" is the direct-interaction
+    # part, and "MSC" flags an approximate reaction code whose meaning is given in the
+    # entry text. "EXL" appears on data whose reaction string is plain elastic
+    # scattering. All are matched; the reaction match still requires the right target,
+    # projectile and process, and for level-resolved data the excitation-energy filter
+    # still selects the channel.
     "dXS/dA": [
         ["DA"],
         ["PAR", "DA"],

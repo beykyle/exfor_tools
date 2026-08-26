@@ -149,6 +149,18 @@ def query_for_reaction(reaction: Reaction, quantity: str):
     return entries
 
 
+#: Columns by which a data set resolves the residual excitation.
+LEVEL_COLUMN_FRAGMENTS = ("E-LVL", "E-EXC", "LVL-NUMB")
+
+
+def is_level_resolved(subentry) -> bool:
+    """Whether a data set separates the residual's levels rather than summing them."""
+    return any(
+        any(fragment in label for fragment in LEVEL_COLUMN_FRAGMENTS)
+        for label in subentry.labels
+    )
+
+
 def is_match(reaction: Reaction, subentry, vocal=False):
     """Checks if the reaction matches a given subentry.
 
@@ -177,17 +189,20 @@ def is_match(reaction: Reaction, subentry, vocal=False):
     if isinstance(product, str):
         if reaction.process is None:
             return False
-        # EXFOR writes some level-resolved measurements as (n,SCT) -- scattering, with
-        # the level given in an E-LVL column -- rather than splitting them into (n,EL)
-        # and (n,INL). The ground-state level of such a data set is elastic scattering,
-        # so SCT satisfies a query for EL; which level is kept is then decided by the
-        # excitation-energy filter, and callers wanting only the elastic channel should
-        # pass elastic_only=True.
-        equivalent = {"EL": {"EL", "SCT"}}.get(
-            reaction.process.upper(), {reaction.process.upper()}
-        )
-        if product not in equivalent:
-            return False
+        process = reaction.process.upper()
+        if product != process:
+            # The EXFOR dictionary defines SCT as "Total scattering (elastic +
+            # inelastic)". Summed, that is not elastic scattering and must not satisfy a
+            # query for it. But some measurements are written as (n,SCT) resolved by
+            # level, in an E-LVL or LVL-NUMB column, rather than being split into
+            # (n,EL) and (n,INL); the ground-state level of those *is* elastic. Such a
+            # data set therefore matches, leaving the excitation-energy filter to pick
+            # the level -- so a caller wanting only the elastic channel must pass
+            # elastic_only=True, which forces Ex_range to (0, 0).
+            if not (
+                process == "EL" and product == "SCT" and is_level_resolved(subentry)
+            ):
+                return False
     else:
         product = (product.getA(), product.getZ())
         if product != reaction.product:
