@@ -177,7 +177,16 @@ def is_match(reaction: Reaction, subentry, vocal=False):
     if isinstance(product, str):
         if reaction.process is None:
             return False
-        if product != reaction.process.upper():
+        # EXFOR writes some level-resolved measurements as (n,SCT) -- scattering, with
+        # the level given in an E-LVL column -- rather than splitting them into (n,EL)
+        # and (n,INL). The ground-state level of such a data set is elastic scattering,
+        # so SCT satisfies a query for EL; which level is kept is then decided by the
+        # excitation-energy filter, and callers wanting only the elastic channel should
+        # pass elastic_only=True.
+        equivalent = {"EL": {"EL", "SCT"}}.get(
+            reaction.process.upper(), {reaction.process.upper()}
+        )
+        if product not in equivalent:
             return False
     else:
         product = (product.getA(), product.getZ())
