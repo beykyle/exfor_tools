@@ -405,9 +405,15 @@ def cross_reference_entry_systematic_err(
 def print_failed_parses(failed_parses):
     for k, v in failed_parses.items():
         print(f"Entry: {k}")
-        print(v.failed_parses[k][0], " : ", v.failed_parses[k][1])
+        # report every failed subentry, not just the last one recorded per entry
+        failures = getattr(v, "failed_parses_by_subentry", None) or dict(
+            [v.failed_parses[k]]
+        )
+        for subentry, e in failures.items():
+            print(subentry, " : ", e)
         print(v.err_analysis)
-        print(v.subentry_err_analysis[v.failed_parses[k][0]])
+        for subentry in failures:
+            print(v.subentry_err_analysis[subentry])
 
 
 def plot_measurements(

@@ -191,6 +191,12 @@ def is_match(reaction: Reaction, subentry, vocal=False):
             subentry.reaction[0].residual.getA(),
             subentry.reaction[0].residual.getZ(),
         )
+        # the residual of a natural target carries the same -3000 sentinel as the
+        # target, and must be normalized the same way, or no elastic scattering data
+        # set on a natural target will ever match
+        if residual[0] == -3000:
+            residual = (0, residual[1])
+
         if reaction.residual is None and reaction.process.upper() in [
             "EL",
             "INL",

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import reduce
 
 import numpy as np
@@ -108,6 +109,7 @@ def parse_energy_dependent_xs(data_set, data_error_columns=["DATA-ERR"]):
 
     # parse errors
     xs_err = []
+    seen_labels = defaultdict(int)
     for label in data_error_columns:
         # parse error column
         err_parser = X4ColumnParser(
@@ -122,12 +124,18 @@ def parse_energy_dependent_xs(data_set, data_error_columns=["DATA-ERR"]):
             raise ValueError(f"Subentry does not have a column called {label}")
         else:
             iyerr = [idx for idx, value in enumerate(data_set.labels) if value == label]
-            if len(iyerr) > 1:
+            # A label may legitimately repeat: some subentries carry two DATA-ERR
+            # columns, one in per-cent and one in absolute units, each mostly null,
+            # which together make up the uncertainty. Take them in order, one per
+            # occurrence of the label in data_error_columns, rather than refusing.
+            occurrence = seen_labels[label]
+            seen_labels[label] += 1
+            if occurrence >= len(iyerr):
                 raise ValueError(
-                    f"Expected only one {label} column, found {len(iyerr)}"
+                    f"Requested {occurrence + 1} {label} columns, found {len(iyerr)}"
                 )
 
-            err = err_parser.getColumn(iyerr[0], data_set)
+            err = err_parser.getColumn(iyerr[occurrence], data_set)
             err_units = err[1]
             err_data = np.nan_to_num(np.array(err[2:], dtype=np.float64))
             # convert to same units as data
@@ -167,6 +175,7 @@ def parse_differential_data(
 
     # parse errors
     xs_err = []
+    seen_labels = defaultdict(int)
     for label in data_error_columns:
         # parse error column
         err_parser = X4ColumnParser(
@@ -181,12 +190,18 @@ def parse_differential_data(
             raise ValueError(f"Subentry does not have a column called {label}")
         else:
             iyerr = [idx for idx, value in enumerate(data_set.labels) if value == label]
-            if len(iyerr) > 1:
+            # A label may legitimately repeat: some subentries carry two DATA-ERR
+            # columns, one in per-cent and one in absolute units, each mostly null,
+            # which together make up the uncertainty. Take them in order, one per
+            # occurrence of the label in data_error_columns, rather than refusing.
+            occurrence = seen_labels[label]
+            seen_labels[label] += 1
+            if occurrence >= len(iyerr):
                 raise ValueError(
-                    f"Expected only one {label} column, found {len(iyerr)}"
+                    f"Requested {occurrence + 1} {label} columns, found {len(iyerr)}"
                 )
 
-            err = err_parser.getColumn(iyerr[0], data_set)
+            err = err_parser.getColumn(iyerr[occurrence], data_set)
             if np.all([x is None for x in err]):
                 continue
 
