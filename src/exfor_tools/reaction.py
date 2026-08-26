@@ -44,7 +44,7 @@ class Reaction:
             self.reaction_string = (
                 f"{get_exfor_particle_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},"
-                f"{get_exfor_particle_symbol(*self.product)})f"
+                f"{get_exfor_particle_symbol(*self.product)})"
             )
         else:
             self.reaction_latex = (
@@ -54,7 +54,7 @@ class Reaction:
             self.reaction_string = (
                 f"{get_exfor_particle_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},"
-                f"{get_exfor_particle_symbol(*self.product)})f"
+                f"{get_exfor_particle_symbol(*self.product)})"
                 f"{get_exfor_particle_symbol(*self.residual)}"
             )
 
@@ -68,7 +68,7 @@ class Reaction:
         elif self.product is not None:
             return (
                 f"{get_exfor_particle_symbol(*self.target)}"
-                f"({get_exfor_particle_symbol(*self.projectile)},{get_exfor_particle_symbol(*self.product)})f"
+                f"({get_exfor_particle_symbol(*self.projectile)},{get_exfor_particle_symbol(*self.product)})"
                 f"{get_exfor_particle_symbol(*self.residual) if self.residual is not None else ''}"
             )
         else:
