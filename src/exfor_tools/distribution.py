@@ -251,6 +251,8 @@ class Distribution:
             statistical_err = -np.diff(statistical_err, axis=0)[0, :]
         elif statistical_err_treatment == "sum":
             statistical_err = np.sum(statistical_err, axis=0)
+        elif statistical_err_treatment == "average":
+            statistical_err = np.mean(np.abs(statistical_err), axis=0)
         else:
             raise ValueError(
                 f"Unknown statistical_err_treatment option: {statistical_err_treatment}"
@@ -410,6 +412,71 @@ class EnergyDistribution(Distribution):
                 **parsing_kwargs,
             )
         ]
+
+    @classmethod
+    def plot(
+        cls,
+        measurements,
+        ax,
+        offsets=None,
+        data_symbol="",
+        rxn_label="",
+        log=True,
+        draw_baseline=False,
+        baseline_offset=None,
+        xlim=None,
+        fontsize=10,
+        label_kwargs={},
+    ):
+        r"""
+        Given a collection of energy-dependent measurements, plots them on the same
+        axis. Unlike `AngularDistribution.plot`, measurements are not offset from one
+        another; they share a common energy axis and are distinguished by color and by
+        an EXFOR subentry label in the legend.
+
+        `offsets`, `draw_baseline` and `baseline_offset` are accepted for signature
+        compatibility with `AngularDistribution.plot` (so that `ExforEntry.plot` can
+        forward to either) and are ignored. `xlim` is applied only if provided.
+        """
+        # allow either a flat list of measurements or a list of lists
+        flat = []
+        for m in measurements:
+            if isinstance(m, (list, tuple)):
+                flat.extend(m)
+            else:
+                flat.append(m)
+
+        for m in flat:
+            label = m.subentry
+            if label_kwargs.get("label_exfor", True) is False:
+                label = None
+            ax.errorbar(
+                m.x,
+                m.y,
+                yerr=m.statistical_err,
+                xerr=m.x_err if not np.allclose(m.x_err, 0) else None,
+                marker="s",
+                markersize=2,
+                alpha=0.75,
+                linestyle="none",
+                elinewidth=1,
+                label=label,
+            )
+
+        if log:
+            ax.set_yscale("log")
+        if xlim is not None:
+            ax.set_xlim(xlim)
+
+        x_units = flat[0].x_units if flat else "MeV"
+        y_units = flat[0].y_units if flat else ""
+        ax.set_xlabel(r"$E_{lab}$" + f" [{x_units}]", fontsize=fontsize)
+        ax.set_ylabel(f"{data_symbol} [{y_units}]", fontsize=fontsize)
+        if rxn_label:
+            ax.set_title(rxn_label, fontsize=fontsize)
+        if any(m.subentry for m in flat):
+            ax.legend(fontsize=max(fontsize - 2, 4))
+        return ax
 
     def to_dataframe(self, citation: str = "") -> pd.DataFrame:
         """
@@ -885,7 +952,7 @@ def extract_staterr_labels(
     """
     if "+ERR-T" in labels and "-ERR-T" in labels:
         return ["+ERR-T", "-ERR-T"], "difference"
-    if "+DATA-ERR" in labels and "+DATA-ERR" in labels:
+    if "+DATA-ERR" in labels and "-DATA-ERR" in labels:
         return ["+DATA-ERR", "-DATA-ERR"], "difference"
     allowed_stat_err_combos = set(
         [frozenset([l, "ERR-DIG"]) for l in allowed_stat_errs]
