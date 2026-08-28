@@ -149,14 +149,26 @@ def query_for_reaction(reaction: Reaction, quantity: str):
     return entries
 
 
-#: Columns by which a data set resolves the residual excitation.
-LEVEL_COLUMN_FRAGMENTS = ("E-LVL", "E-EXC", "LVL-NUMB")
+#: Columns by which a data set states which residual excitation it covers. Some
+#: resolve it to a single level -- E-LVL, E-EXC, LVL-NUMB -- and some only bound it,
+#: EXFOR spelling the bound E-LVL-MAX, E-EXC-MAX or E-EXC-MX-A. All are matched here,
+#: so the fragments below are deliberately prefixes.
+EXCITATION_COLUMN_FRAGMENTS = ("E-LVL", "E-EXC", "LVL-NUMB")
 
 
-def is_level_resolved(subentry) -> bool:
-    """Whether a data set separates the residual's levels rather than summing them."""
+def specifies_excitation(subentry) -> bool:
+    """Whether a data set states the residual excitation it covers.
+
+    True both when the excitation is resolved to one level and when it is merely
+    bounded, in which case the data set is summed over every level below the bound --
+    the ground state plus whatever low-lying levels the experiment could not separate.
+    The two are not the same thing, and this predicate deliberately does not
+    distinguish them: the published nucleon-nucleus corpora count both as elastic,
+    with bounds running from 30 keV on 93Nb up to 800 keV. A caller that needs the
+    ground state alone must check for a resolved column itself.
+    """
     return any(
-        any(fragment in label for fragment in LEVEL_COLUMN_FRAGMENTS)
+        any(fragment in label for fragment in EXCITATION_COLUMN_FRAGMENTS)
         for label in subentry.labels
     )
 
@@ -192,15 +204,19 @@ def is_match(reaction: Reaction, subentry, vocal=False):
         process = reaction.process.upper()
         if product != process:
             # The EXFOR dictionary defines SCT as "Total scattering (elastic +
-            # inelastic)". Summed, that is not elastic scattering and must not satisfy a
-            # query for it. But some measurements are written as (n,SCT) resolved by
-            # level, in an E-LVL or LVL-NUMB column, rather than being split into
-            # (n,EL) and (n,INL); the ground-state level of those *is* elastic. Such a
-            # data set therefore matches, leaving the excitation-energy filter to pick
-            # the level -- so a caller wanting only the elastic channel must pass
-            # elastic_only=True, which forces Ex_range to (0, 0).
+            # inelastic)". Summed over everything, that is not elastic scattering and
+            # must not satisfy a query for it. But many measurements are written as
+            # (n,SCT) against an excitation column rather than being split into (n,EL)
+            # and (n,INL): either resolved to a level, whose ground state *is* elastic,
+            # or bounded above by a few tens to a few hundred keV, which is the ground
+            # state plus the low-lying levels the experiment could not separate. Both
+            # match, leaving the excitation-energy filter to select the channel where
+            # the data set resolves one -- so a caller wanting only the elastic channel
+            # must pass elastic_only=True, which forces Ex_range to (0, 0). A data set
+            # that only bounds its excitation has no column for that filter to act on
+            # and is admitted whole; see specifies_excitation.
             if not (
-                process == "EL" and product == "SCT" and is_level_resolved(subentry)
+                process == "EL" and product == "SCT" and specifies_excitation(subentry)
             ):
                 return False
     else:
