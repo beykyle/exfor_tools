@@ -237,9 +237,11 @@ class Distribution:
         statistical_err = []
 
         for i, label in enumerate(statistical_err_labels):
-            if label in y_err_labels:
-                index = y_err_labels.index(label)
-                statistical_err.append(y_errs[index])
+            # a label may occur more than once (e.g. two DATA-ERR columns, one in
+            # per-cent and one absolute); take every occurrence
+            for index, candidate in enumerate(y_err_labels):
+                if candidate == label:
+                    statistical_err.append(y_errs[index])
 
         if statistical_err == []:
             statistical_err = [np.zeros((rows))]

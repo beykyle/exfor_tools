@@ -173,6 +173,10 @@ class ExforEntry:
         self.subentries = [key[1] for key in entry_datasets.keys()]
         self.measurements = []
         self.failed_parses = {}
+        # failed_parses is keyed by entry and so retains only one failure per entry,
+        # which loses information when several subentries of one entry fail. Keep the
+        # full record alongside it, keyed by subentry.
+        self.failed_parses_by_subentry = {}
 
         for key, data_set in entry_datasets.items():
             if not isinstance(data_set.reaction[0], X4Reaction):
@@ -205,6 +209,7 @@ class ExforEntry:
                     self.measurements.append(m)
                 for subentry, e in failed_parses.items():
                     self.failed_parses[key[0]] = (subentry, e)
+                    self.failed_parses_by_subentry[subentry] = e
 
     def bibtex(self):
         if self.meta is None:

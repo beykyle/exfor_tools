@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import reduce
 
 import numpy as np
@@ -25,12 +26,35 @@ from x4i3.exfor_column_parsing import (
 
 # these are the supported quantities at the moment
 quantity_matches = {
-    "dXS/dA": [["DA"], ["PAR", "DA"]],
+    # EXFOR qualifies the differential cross section in several ways that leave it a
+    # differential cross section. Per the EXFOR dictionary: "AV" is an average (the
+    # subentry carries EN-MEAN), "DERIV" is derived data, "DI" is the direct-interaction
+    # part, and "MSC" flags an approximate reaction code whose meaning is given in the
+    # entry text. "EXL" appears on data whose reaction string is plain elastic
+    # scattering. All are matched; the reaction match still requires the right target,
+    # projectile and process, and for level-resolved data the excitation-energy filter
+    # still selects the channel.
+    "dXS/dA": [
+        ["DA"],
+        ["PAR", "DA"],
+        ["DA", "AV"],
+        ["PAR", "DA", "AV"],
+        ["DA", "DERIV"],
+        ["EXL", "DA"],
+        ["DI", "DA"],
+        ["DI", "DA", "MSC"],
+    ],
     "dXS/dRuth": [["DA", "RTH"], ["DA", "RTH/REL"]],
-    "Ay": [["POL/DA", "ANA"]],
+    # EXFOR tabulates the analyzing power under several codes. "POL/DA,ANA" is the
+    # modern one; a bare "POL/DA" is the outgoing-particle polarization, which equals
+    # the analyzing power for elastic scattering by time-reversal invariance; and
+    # "POL/DA,ASY" is the measured asymmetry, which is the analyzing power once the
+    # beam polarization is divided out. Older entries use the latter two.
+    "Ay": [["POL/DA", "ANA"], ["POL/DA"], ["POL/DA", "ASY"]],
     "Q": [["POL/DA", "SRF"]],
     "XS": [
         ["SIG"],
+        ["SIG", "AV"],
     ],
 }
 quantities = list(quantity_matches.keys())
@@ -108,6 +132,7 @@ def parse_energy_dependent_xs(data_set, data_error_columns=["DATA-ERR"]):
 
     # parse errors
     xs_err = []
+    seen_labels = defaultdict(int)
     for label in data_error_columns:
         # parse error column
         err_parser = X4ColumnParser(
@@ -122,12 +147,18 @@ def parse_energy_dependent_xs(data_set, data_error_columns=["DATA-ERR"]):
             raise ValueError(f"Subentry does not have a column called {label}")
         else:
             iyerr = [idx for idx, value in enumerate(data_set.labels) if value == label]
-            if len(iyerr) > 1:
+            # A label may legitimately repeat: some subentries carry two DATA-ERR
+            # columns, one in per-cent and one in absolute units, each mostly null,
+            # which together make up the uncertainty. Take them in order, one per
+            # occurrence of the label in data_error_columns, rather than refusing.
+            occurrence = seen_labels[label]
+            seen_labels[label] += 1
+            if occurrence >= len(iyerr):
                 raise ValueError(
-                    f"Expected only one {label} column, found {len(iyerr)}"
+                    f"Requested {occurrence + 1} {label} columns, found {len(iyerr)}"
                 )
 
-            err = err_parser.getColumn(iyerr[0], data_set)
+            err = err_parser.getColumn(iyerr[occurrence], data_set)
             err_units = err[1]
             err_data = np.nan_to_num(np.array(err[2:], dtype=np.float64))
             # convert to same units as data
@@ -167,6 +198,7 @@ def parse_differential_data(
 
     # parse errors
     xs_err = []
+    seen_labels = defaultdict(int)
     for label in data_error_columns:
         # parse error column
         err_parser = X4ColumnParser(
@@ -181,12 +213,18 @@ def parse_differential_data(
             raise ValueError(f"Subentry does not have a column called {label}")
         else:
             iyerr = [idx for idx, value in enumerate(data_set.labels) if value == label]
-            if len(iyerr) > 1:
+            # A label may legitimately repeat: some subentries carry two DATA-ERR
+            # columns, one in per-cent and one in absolute units, each mostly null,
+            # which together make up the uncertainty. Take them in order, one per
+            # occurrence of the label in data_error_columns, rather than refusing.
+            occurrence = seen_labels[label]
+            seen_labels[label] += 1
+            if occurrence >= len(iyerr):
                 raise ValueError(
-                    f"Expected only one {label} column, found {len(iyerr)}"
+                    f"Requested {occurrence + 1} {label} columns, found {len(iyerr)}"
                 )
 
-            err = err_parser.getColumn(iyerr[0], data_set)
+            err = err_parser.getColumn(iyerr[occurrence], data_set)
             if np.all([x is None for x in err]):
                 continue
 
