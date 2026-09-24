@@ -24,17 +24,25 @@ class Reaction:
         if self.process is None and self.product is None:
             raise ValueError("Must specify either process or product in reaction")
 
-        if self.residual is not None and self.process is not None:
-            raise ValueError("Cannot specify residual for a process reaction")
-
         if self.process is not None:
+            # A process may name a residual, e.g. 56Fe(p,n)56Co: EXFOR writes the
+            # outgoing particle as a process code and still identifies the residual.
+            residual_latex = (
+                get_latex(*self.residual) if self.residual is not None else ""
+            )
+            residual_symbol = (
+                get_exfor_particle_symbol(*self.residual)
+                if self.residual is not None
+                else ""
+            )
             self.reaction_latex = (
                 f"{get_latex(*self.target)}({get_latex(*self.projectile)},"
-                + f"{self.process.lower()})"
+                + f"{self.process.lower()}){residual_latex}"
             )
             self.reaction_string = (
                 f"{get_exfor_particle_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},{self.process.lower()})"
+                f"{residual_symbol}"
             )
         elif self.residual is None:
             self.reaction_latex = (
@@ -237,12 +245,14 @@ def is_match(reaction: Reaction, subentry, vocal=False):
         if residual[0] == -3000:
             residual = (0, residual[1])
 
-        if reaction.residual is None and reaction.process.upper() in [
-            "EL",
-            "INL",
-            "SCT",
-        ]:
-            return residual == reaction.target
+        if reaction.residual is None:
+            # A caller that named neither a residual nor a scattering process has not
+            # asked for this channel; returning a mismatch is the answer, not raising.
+            return (
+                reaction.process is not None
+                and reaction.process.upper() in ["EL", "INL", "SCT"]
+                and residual == reaction.target
+            )
 
         return residual == reaction.residual
 

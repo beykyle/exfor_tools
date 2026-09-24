@@ -50,11 +50,24 @@ quantity_matches = {
     # the analyzing power for elastic scattering by time-reversal invariance; and
     # "POL/DA,ASY" is the measured asymmetry, which is the analyzing power once the
     # beam polarization is divided out. Older entries use the latter two.
-    "Ay": [["POL/DA", "ANA"], ["POL/DA"], ["POL/DA", "ASY"]],
-    "Q": [["POL/DA", "SRF"]],
+    # "PAR" marks data resolved to a particular level of the residual, which is how
+    # EXFOR writes a charge-exchange measurement to the isobaric analog state, e.g.
+    # 49-TI-49(P,N)23-V-49,PAR,POL/DA,,ANA. It qualifies the quantity the same way it
+    # does for dXS/dA above, and the excitation-energy filter still selects the level.
+    "Ay": [
+        ["POL/DA", "ANA"],
+        ["PAR", "POL/DA", "ANA"],
+        ["POL/DA"],
+        ["PAR", "POL/DA"],
+        ["POL/DA", "ASY"],
+        ["PAR", "POL/DA", "ASY"],
+    ],
+    "Q": [["POL/DA", "SRF"], ["PAR", "POL/DA", "SRF"]],
     "XS": [
         ["SIG"],
+        ["PAR", "SIG"],
         ["SIG", "AV"],
+        ["PAR", "SIG", "AV"],
     ],
 }
 quantities = list(quantity_matches.keys())
