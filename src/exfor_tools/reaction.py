@@ -31,7 +31,7 @@ class Reaction:
                 get_latex(*self.residual) if self.residual is not None else ""
             )
             residual_symbol = (
-                get_exfor_particle_symbol(*self.residual)
+                get_exfor_nuclide_symbol(*self.residual)
                 if self.residual is not None
                 else ""
             )
@@ -40,7 +40,7 @@ class Reaction:
                 + f"{self.process.lower()}){residual_latex}"
             )
             self.reaction_string = (
-                f"{get_exfor_particle_symbol(*self.target)}"
+                f"{get_exfor_nuclide_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},{self.process.lower()})"
                 f"{residual_symbol}"
             )
@@ -50,7 +50,7 @@ class Reaction:
                 + f"{get_latex(*self.product)})"
             )
             self.reaction_string = (
-                f"{get_exfor_particle_symbol(*self.target)}"
+                f"{get_exfor_nuclide_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},"
                 f"{get_exfor_particle_symbol(*self.product)})"
             )
@@ -60,24 +60,24 @@ class Reaction:
                 + f"{get_latex(*self.product)}){get_latex(*self.residual)}"
             )
             self.reaction_string = (
-                f"{get_exfor_particle_symbol(*self.target)}"
+                f"{get_exfor_nuclide_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},"
                 f"{get_exfor_particle_symbol(*self.product)})"
-                f"{get_exfor_particle_symbol(*self.residual)}"
+                f"{get_exfor_nuclide_symbol(*self.residual)}"
             )
 
     def __str__(self):
         if self.process is not None:
             return (
-                f"{get_exfor_particle_symbol(*self.target)}"
+                f"{get_exfor_nuclide_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},{self.process})"
-                f"{get_exfor_particle_symbol(*self.residual) if self.residual is not None else ''}"
+                f"{get_exfor_nuclide_symbol(*self.residual) if self.residual is not None else ''}"
             )
         elif self.product is not None:
             return (
-                f"{get_exfor_particle_symbol(*self.target)}"
+                f"{get_exfor_nuclide_symbol(*self.target)}"
                 f"({get_exfor_particle_symbol(*self.projectile)},{get_exfor_particle_symbol(*self.product)})"
-                f"{get_exfor_particle_symbol(*self.residual) if self.residual is not None else ''}"
+                f"{get_exfor_nuclide_symbol(*self.residual) if self.residual is not None else ''}"
             )
         else:
             raise ValueError("Could not figure out process or product from reaction")
@@ -150,7 +150,7 @@ def query_for_reaction(reaction: Reaction, quantity: str):
     exfor_quantity = quantity_matches[quantity][0][0]
     entries = __EXFOR_DB__.query(
         quantity=exfor_quantity,
-        target=get_exfor_particle_symbol(*reaction.target),
+        target=get_exfor_nuclide_symbol(*reaction.target),
         projectile=get_exfor_particle_symbol(*reaction.projectile),
         reaction=get_exfor_reaction_query(reaction),
     ).keys()
@@ -257,9 +257,53 @@ def is_match(reaction: Reaction, subentry, vocal=False):
         return residual == reaction.residual
 
 
+#: EXFOR codes for light particles. These are legal only in the incident and
+#: outgoing particle slots of a reaction string (SF2 and SF3), and are how the
+#: x4i3 index spells those particles in its ``projectile`` and ``reaction``
+#: columns. Note 3He is ``HE3``, without a hyphen.
+EXFOR_PARTICLE_CODES = {
+    (1, 0): "N",
+    (1, 1): "P",
+    (2, 1): "D",
+    (3, 1): "T",
+    (3, 2): "HE3",
+    (4, 2): "A",
+}
+
+
+def get_exfor_nuclide_symbol(A, Z):
+    """
+    Returns the symbol for a nucleus in the target or residual slot of an EXFOR
+    reaction string (SF1 and SF4), as the x4i3 index spells it in its ``target``
+    column: ``Sym-A``, e.g. ``H-1``, ``He-4``, ``Fe-56``, or ``Fe-0`` for a
+    natural target. Light-particle codes are never used here, so a proton target
+    is ``H-1``, not ``P``.
+
+    Params:
+        A: Mass number (0 for a natural target).
+        Z: Atomic number.
+    Returns:
+        EXFOR nuclide symbol.
+    Raises:
+        ValueError: If Z is 0. A neutron is not a target or residual nucleus,
+            and ``N-1`` would be read as nitrogen.
+    """
+    if Z == 0:
+        raise ValueError(
+            f"(A, Z) = ({A}, {Z}) has no EXFOR target or residual symbol: "
+            "a neutron cannot be a target or residual nucleus"
+        )
+    return f"{periodictable.elements[Z].symbol}-{A}"
+
+
 def get_exfor_particle_symbol(A, Z):
     """
-    Returns the EXFOR particle symbol for a given nucleus.
+    Returns the symbol for an incident or outgoing particle in an EXFOR reaction
+    string (SF2 and SF3), as the x4i3 index spells it in its ``projectile`` and
+    ``reaction`` columns: a light-particle code (``N``, ``P``, ``D``, ``T``,
+    ``HE3``, ``A``), or ``Z-Sym-A`` for anything heavier, e.g. ``6-C-12``.
+
+    Not for targets or residuals; use get_exfor_nuclide_symbol for those.
 
     Params:
         A: Mass number.
@@ -267,17 +311,9 @@ def get_exfor_particle_symbol(A, Z):
     Returns:
         EXFOR particle symbol.
     """
-    exfor_particle_symbols = {
-        (1, 0): "N",
-        (1, 1): "P",
-        (2, 1): "D",
-        (3, 1): "T",
-        (4, 2): "A",
-    }
-    if (A, Z) in exfor_particle_symbols:
-        return exfor_particle_symbols[(A, Z)]
-    else:
-        return f"{periodictable.elements[Z].symbol}-{A}"
+    if (A, Z) in EXFOR_PARTICLE_CODES:
+        return EXFOR_PARTICLE_CODES[(A, Z)]
+    return f"{Z}-{get_exfor_nuclide_symbol(A, Z)}"
 
 
 def get_latex(A, Z, Ex=None):
